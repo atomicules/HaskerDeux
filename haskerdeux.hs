@@ -32,26 +32,27 @@ getEnvVar x = do {
 } 
 
 
---setproxy :: Maybe String -> [CurlOption] --very close to working, but the [CurlOption] isn't quite right
---setproxy :: Monad m => Maybe [Char] -> m [CurlOption]
---apparently!
+setproxy :: Monad m => Maybe [Char] -> m [CurlOption]
 setproxy proxy = do
 	let systemproxyparts = reverse $ splitOneOf "/;:@" $ fromJust proxy --surely fromJust is ok in this scenerio?
 	let port = read(systemproxyparts !! 0)::Word32
-	let opts = if isInfixOf "@" $ fromJust proxy
+	let proxyopts = if isInfixOf "@" $ fromJust proxy
 		then [ CurlProxyPort port , CurlProxy $ systemproxyparts !! 1, CurlProxyPassword  $ systemproxyparts !! 2 , CurlProxyUser $ systemproxyparts !! 3] 
 		else [ CurlProxyPort port, CurlProxy $ systemproxyparts !! 1 ]
-	return opts
+	return proxyopts
 
 main = withCurlDo $ do --http://flygdynamikern.blogspot.com/2009/03/extended-sessions-with-haskell-curl.html
 
 	systemproxy <- getEnvVar "http-proxy"
 
-	when (isJust systemproxy) (setproxy systemproxy)
+	let opts = if isJust systemproxy
+		then head $ setproxy systemproxy --I don't get why this is a nested list. Something to do with the return statement?
+		else []
+	
 
 
 	curl <- initialize
-	--setopts curl opts
+	setopts curl opts
 
 	(command:argList) <- getArgs
 	dispatch command argList
