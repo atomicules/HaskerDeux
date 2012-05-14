@@ -10,6 +10,7 @@ import Network.Curl --need to install
 import Data.Word (Word32) --for use with Curl port
 import Control.Monad
 import Data.Maybe
+import Data.Aeson --need to install for JSON
 
 
 
@@ -50,7 +51,6 @@ main = withCurlDo $ do --http://flygdynamikern.blogspot.com/2009/03/extended-ses
 		else []
 	
 
-
 	curl <- initialize
 	setopts curl opts
 
@@ -58,15 +58,15 @@ main = withCurlDo $ do --http://flygdynamikern.blogspot.com/2009/03/extended-ses
 	dispatch command argList
 
 
---today :: [String] -> IO ()
---today [username, password] = do
---	let user = C.pack username
---	let pass = C.pack password
---	let req = applyBasicAuth user pass $ fromJust $ parseUrl  "https://teuxdeux.com/api/list.json"
---	res <- withManager $ httpLbs req
---	L.putStrLn $ responseBody res
+today :: [String] -> IO ()
+today [username, password] = do
+	opts = [CurlUserPwd $ username++":"++password] --http://stackoverflow.com/a/2140445/208793
+	body <- curlGetString "https://teuxdeux.com/api/list.json" opts
 
-	--http://stackoverflow.com/a/5614946/208793
+	--maybe something like
+	decode $ snd body :: Result JSValue --http://stackoverflow.com/a/2089385/208793
+	
+
 
 
 
