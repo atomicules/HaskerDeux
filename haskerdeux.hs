@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 --HaskerDeux
 
 import System.Environment
@@ -10,12 +11,14 @@ import Network.Curl --need to install
 import Data.Word (Word32) --for use with Curl port
 import Control.Monad
 import Data.Maybe
-import Data.Aeson --need to install for JSON
+import Text.JSON --need to install for JSON
+import Text.JSON.Generic --need to install for JSON
+import qualified Data.Map as Map
 
 
-
+--Note to self: to run you type `runhaskell haskeduex.hs test "me" "this" "that"`, etc
 dispatch :: String -> [String] -> IO ()
---dispatch "today" = today
+dispatch "today" = today
 --dispatch "new" = new
 --dispatch "complete" = complete
 dispatch "test" = test
@@ -60,19 +63,24 @@ main = withCurlDo $ do --http://flygdynamikern.blogspot.com/2009/03/extended-ses
 
 today :: [String] -> IO ()
 today [username, password] = do
-	opts = [CurlUserPwd $ username++":"++password] --http://stackoverflow.com/a/2140445/208793
+	let opts = [CurlUserPwd $ username++":"++password] --http://stackoverflow.com/a/2140445/208793
 	body <- curlGetString "https://teuxdeux.com/api/list.json" opts
-
-	--maybe something like
-	decode $ snd body :: Result JSValue --http://stackoverflow.com/a/2089385/208793
-	
-
-
-
-
+	let tds = decodeJSON $ snd body :: [Teuxdeux]
+	print tds
+	--Map.lookup 
 
 test :: [String] -> IO ()
 test [username, password, command] = do
 	putStrLn username
 	putStrLn password
 	putStrLn command
+
+--Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
+data Teuxdeux = Teuxdeux {
+    id :: Integer,
+	do_on :: String, 
+	todo :: String,
+	done :: Bool
+} deriving (Eq, Show, Data, Typeable) 
+
+
