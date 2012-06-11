@@ -14,6 +14,8 @@ import Data.Maybe
 import Text.JSON --need to install for JSON
 import Text.JSON.Generic --need to install for JSON
 import qualified Data.Map as Map
+import Data.Time
+import System.Locale (defaultTimeLocale)
 
 
 --Note to self: to run you type `runhaskell haskeduex.hs test "me" "this" "that"`, etc
@@ -66,8 +68,11 @@ today [username, password] = do
 	let opts = [CurlUserPwd $ username++":"++password] --http://stackoverflow.com/a/2140445/208793
 	body <- curlGetString "https://teuxdeux.com/api/list.json" opts
 	let tds = decodeJSON $ snd body :: [Teuxdeux]
-	print tds
-	--Map.lookup 
+	--Get today's date. Need <- else get IO string
+	todays_date <-  fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
+	print $ filter (\td -> do_on td ==todays_date) tds
+
+
 
 test :: [String] -> IO ()
 test [username, password, command] = do
@@ -82,5 +87,6 @@ data Teuxdeux = Teuxdeux {
 	todo :: String,
 	done :: Bool
 } deriving (Eq, Show, Data, Typeable) 
+
 
 
