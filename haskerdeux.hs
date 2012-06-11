@@ -70,7 +70,8 @@ today [username, password] = do
 	let tds = decodeJSON $ snd body :: [Teuxdeux]
 	--Get today's date. Need <- else get IO string
 	todays_date <-  fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
-	print $ filter (\td -> do_on td ==todays_date) tds
+	let tdsf = filter (\td -> do_on td ==todays_date && done td == False) tds
+	putStr $ unlines $ map (\td ->  todo td) tdsf
 
 
 
