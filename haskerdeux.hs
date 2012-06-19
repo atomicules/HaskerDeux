@@ -21,11 +21,8 @@ import System.Locale (defaultTimeLocale)
 --Note to self: to run you type `runhaskell haskeduex.hs test "me" "this" "that"`, etc
 dispatch :: String -> [String] -> IO ()
 dispatch "today" = today
---dispatch "new" = new
---dispatch "complete" = complete
-dispatch "test" = test
---dispatch "edit" = edit
---dispatch "delete" = delete
+dispatch "new" = new
+
 
 --Define function to get Env variable.
 --from http://stackoverflow.com/a/2682887/208793
@@ -47,6 +44,7 @@ setproxy proxy = do
 		else [ CurlProxyPort port, CurlProxy $ systemproxyparts !! 1 ]
 	return proxyopts
 
+
 main = withCurlDo $ do --http://flygdynamikern.blogspot.com/2009/03/extended-sessions-with-haskell-curl.html
 
 	systemproxy <- getEnvVar "http-proxy"
@@ -56,30 +54,38 @@ main = withCurlDo $ do --http://flygdynamikern.blogspot.com/2009/03/extended-ses
 		else []
 	
 
-	curl <- initialize
-	setopts curl opts
+	--Get today's date. Need <- else get IO string
+	todays_date <- fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
 
 	(command:argList) <- getArgs
-	dispatch command argList
+	dispatch command $ todays_date:argList
 
 
 today :: [String] -> IO ()
-today [username, password] = do
+today [todays_date, username, password] = do
 	let opts = [CurlUserPwd $ username++":"++password] --http://stackoverflow.com/a/2140445/208793
 	body <- curlGetString "https://teuxdeux.com/api/list.json" opts
 	let tds = decodeJSON $ snd body :: [Teuxdeux]
-	--Get today's date. Need <- else get IO string
-	todays_date <-  fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
 	let tdsf = filter (\td -> do_on td ==todays_date && done td == False) tds
 	putStr $ unlines $ map (\td ->  todo td) tdsf
 
+new :: [String] -> IO ()
+new [todays_date, username, password, todo] = do
+	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item[todo]="++todo, "todo_item[do_on]="++todays_date] ]
+	curl <- initialize
+	resp <- do_curl_ curl "https://teuxdeux.com/api/todo.json" opts :: IO CurlResponse
+	if respCurlCode resp == CurlOK && respStatus resp == 200
+		then putStrLn "Added!"
+		else putStrLn "Uh Oh! Didn't work!"
 
 
-test :: [String] -> IO ()
-test [username, password, command] = do
-	putStrLn username
-	putStrLn password
-	putStrLn command
+--Remaining commands to implement
+--crossoff :: [String] -> IO ()
+--crossoff [username, password, id] = do
+--
+--putoff ::
+--
+
 
 --Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
 data Teuxdeux = Teuxdeux {
@@ -88,6 +94,3 @@ data Teuxdeux = Teuxdeux {
 	todo :: String,
 	done :: Bool
 } deriving (Eq, Show, Data, Typeable) 
-
-
-
