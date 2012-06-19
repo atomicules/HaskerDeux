@@ -7,13 +7,11 @@ import System.IO.Error
 import Data.List
 import Data.List.Split --need to install
 import Network.Curl --need to install
---import Network.TLS --still needed with Curl?
 import Data.Word (Word32) --for use with Curl port
 import Control.Monad
 import Data.Maybe
 import Text.JSON --need to install for JSON
 import Text.JSON.Generic --need to install for JSON
-import qualified Data.Map as Map
 import Data.Time
 import System.Locale (defaultTimeLocale)
 
@@ -24,36 +22,7 @@ dispatch "today" = today
 dispatch "new" = new
 
 
---Define function to get Env variable.
---from http://stackoverflow.com/a/2682887/208793
---As don't care about error, just the actual thing.
-getEnvVar x = do {
-	var <- getEnv x;
-	return (Just var);
-} `catch` \ex -> do {
-	return Nothing
-} 
-
-
-setproxy :: Monad m => Maybe [Char] -> m [CurlOption]
-setproxy proxy = do
-	let systemproxyparts = reverse $ splitOneOf "/;:@" $ fromJust proxy --surely fromJust is ok in this scenerio?
-	let port = read(systemproxyparts !! 0)::Word32
-	let proxyopts = if isInfixOf "@" $ fromJust proxy
-		then [ CurlProxyPort port , CurlProxy $ systemproxyparts !! 1, CurlProxyPassword  $ systemproxyparts !! 2 , CurlProxyUser $ systemproxyparts !! 3] 
-		else [ CurlProxyPort port, CurlProxy $ systemproxyparts !! 1 ]
-	return proxyopts
-
-
-main = withCurlDo $ do --http://flygdynamikern.blogspot.com/2009/03/extended-sessions-with-haskell-curl.html
-
-	systemproxy <- getEnvVar "http-proxy"
-
-	let opts = if isJust systemproxy
-		then head $ setproxy systemproxy --I don't get why this is a nested list. Something to do with the return statement?
-		else []
-	
-
+main = do 
 	--Get today's date. Need <- else get IO string
 	todays_date <- fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
 
@@ -62,7 +31,7 @@ main = withCurlDo $ do --http://flygdynamikern.blogspot.com/2009/03/extended-ses
 
 
 today :: [String] -> IO ()
-today [todays_date, username, password] = do
+today [todays_date, username, password] = withCurlDo $ do
 	let opts = [CurlUserPwd $ username++":"++password] --http://stackoverflow.com/a/2140445/208793
 	body <- curlGetString "https://teuxdeux.com/api/list.json" opts
 	let tds = decodeJSON $ snd body :: [Teuxdeux]
@@ -70,7 +39,7 @@ today [todays_date, username, password] = do
 	putStr $ unlines $ map (\td ->  todo td) tdsf
 
 new :: [String] -> IO ()
-new [todays_date, username, password, todo] = do
+new [todays_date, username, password, todo] = withCurlDo $ do
 	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item[todo]="++todo, "todo_item[do_on]="++todays_date] ]
 	curl <- initialize
 	resp <- do_curl_ curl "https://teuxdeux.com/api/todo.json" opts :: IO CurlResponse
