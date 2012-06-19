@@ -20,9 +20,12 @@ import System.Locale (defaultTimeLocale)
 dispatch :: String -> [String] -> IO ()
 dispatch "today" = today
 dispatch "new" = new
+dispatch "crossoff" = crossoff
+dispatch "putoff" = putoff
 
 
 main = do 
+
 	--Get today's date. Need <- else get IO string
 	todays_date <- fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
 
@@ -36,7 +39,8 @@ today [todays_date, username, password] = withCurlDo $ do
 	body <- curlGetString "https://teuxdeux.com/api/list.json" opts
 	let tds = decodeJSON $ snd body :: [Teuxdeux]
 	let tdsf = filter (\td -> do_on td ==todays_date && done td == False) tds
-	putStr $ unlines $ map (\td ->  todo td) tdsf
+	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ map (\td ->  todo td) tdsf --numbering from LYAH
+
 
 new :: [String] -> IO ()
 new [todays_date, username, password, todo] = withCurlDo $ do
@@ -48,12 +52,38 @@ new [todays_date, username, password, todo] = withCurlDo $ do
 		else putStrLn "Uh Oh! Didn't work!"
 
 
---Remaining commands to implement
---crossoff :: [String] -> IO ()
---crossoff [username, password, id] = do
---
---putoff ::
---
+crossoff :: [String] -> IO ()
+crossoff [todays_date, username, password, number] = withCurlDo $ do
+	--Somehow convert number to item id. Since they aren't in memory, which?
+	--Need to get a list of todos again
+	--Need to do this DRYly at some point though
+	let opts1 = [CurlUserPwd $ username++":"++password] 
+	body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
+	let tds = decodeJSON $ snd body :: [Teuxdeux]
+	let tdsf = filter (\td -> do_on td ==todays_date && done td == False) tds
+	let itemid = Main.id $ tdsf!!(read number::Int)
+	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item["++(show itemid)++"?][done]=1"] ]
+	curl <- initialize
+	resp <- do_curl_ curl "https://teuxdeux.com/api/update.json" opts :: IO CurlResponse
+	if respCurlCode resp == CurlOK && respStatus resp == 200
+		then putStrLn "Crossed Off!"
+		else putStrLn "Uh Oh! Didn't work!"
+
+
+putoff :: [String] -> IO ()
+putoff [todays_date, username, password, number] = withCurlDo $ do
+	let tomorrows_date = show (addDays 1 $ read todays_date::Day)
+	let opts1 = [CurlUserPwd $ username++":"++password] 
+	body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
+	let tds = decodeJSON $ snd body :: [Teuxdeux]
+	let tdsf = filter (\td -> do_on td ==todays_date && done td == False) tds
+	let itemid = Main.id $ tdsf!!(read number::Int)
+	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item["++(show itemid)++"?][do_on]="++tomorrows_date] ]
+	curl <- initialize
+	resp <- do_curl_ curl "https://teuxdeux.com/api/update.json" opts :: IO CurlResponse
+	if respCurlCode resp == CurlOK && respStatus resp == 200
+		then putStrLn "Put Off!"
+		else putStrLn "Uh Oh! Didn't work!"
 
 
 --Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
