@@ -22,6 +22,7 @@ dispatch "today" = today
 dispatch "new" = new
 dispatch "crossoff" = crossoff
 dispatch "putoff" = putoff
+dispatch "moveto" = moveto
 
 
 main = do 
@@ -85,6 +86,20 @@ putoff [todays_date, username, password, number] = withCurlDo $ do
 		then putStrLn "Put Off!"
 		else putStrLn "Uh Oh! Didn't work!"
 
+
+moveto :: [String] -> IO ()
+moveto [todays_date, username, password, number, new_date] = withCurlDo $ do
+	let opts1 = [CurlUserPwd $ username++":"++password] 
+	body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
+	let tds = decodeJSON $ snd body :: [Teuxdeux]
+	let tdsf = filter (\td -> do_on td ==todays_date && done td == False) tds
+	let itemid = Main.id $ tdsf!!(read number::Int)
+	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item["++(show itemid)++"?][do_on]="++new_date] ]
+	curl <- initialize
+	resp <- do_curl_ curl "https://teuxdeux.com/api/update.json" opts :: IO CurlResponse
+	if respCurlCode resp == CurlOK && respStatus resp == 200
+		then putStrLn "Moved!"
+		else putStrLn "Uh Oh! Didn't work!"
 
 --Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
 data Teuxdeux = Teuxdeux {
