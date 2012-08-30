@@ -14,7 +14,7 @@ import Text.JSON --need to install for JSON
 import Text.JSON.Generic --need to install for JSON
 import Data.Time
 import System.Locale (defaultTimeLocale)
-
+import System.Directory
 
 --Note to self: to run you type `runhaskell haskeduex.hs test "me" "this" "that"`, etc
 dispatch :: String -> [String] -> IO ()
@@ -34,6 +34,19 @@ main = do
 	dispatch command $ todays_date:argList
 	--want to check if username and password supplied? anyway? Depends on length of arglist and command used
 	--As that way, if not their can read from netrc and add into argList
+
+readnetrc = do
+	home <- getHomeDirectory
+	netrc <- fmap lines $ readFile (home ++ "/.netrc")
+	let netrc' = dropWhile (not . isInfixOf "teuxdeux") netrc
+	let (username, password) = if "login" `isInfixOf` (head netrc')
+		-- if entry is on one line	
+		then (getcred "login", getcred "password") 
+		-- if entry is on multiple lines
+		else (last $ words $ netrc' !! 1, last $ words $ netrc' !! 2)
+		where getcred = \c -> (dropWhile (not . isInfixOf c) $ words $ head netrc') !! 1
+	print (username, password)
+
 
 today :: [String] -> IO ()
 today [todays_date, username, password] = withCurlDo $ do
