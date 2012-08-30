@@ -33,27 +33,27 @@ You can use those numbers with the PutOff and CheckOff commands.
 
 For putting off a task until tomorrow.
 
-`runhaskell haskerdeux.hs putoff <username> <password> <tasknumber from today list>`
+`runhaskell haskerdeux.hs putoff <tasknumber from today list> <username> <password>`
 
 E.g:
 
-`runhaskell haskerdeux.hs putoff superprocrastinator mysecretpassword 3`
+`runhaskell haskerdeux.hs putoff 3 superprocrastinator mysecretpassword`
 
 ###CrossOff
 
 For marking a task as complete
 
-`runhaskell haskerdeux.hs crossoff <username> <password> <tasknumber from today list>`
+`runhaskell haskerdeux.hs crossoff <tasknumber from today list> <username> <password>`
 
 ###New
 
 For creating new tasks
 
-`runhaskell haskerdeux.hs new <username> <password> "<A todo item>"`
+`runhaskell haskerdeux.hs new "<A todo item>" <username> <password>`
 
 E.g:
 
-`runhaskell haskerdeux.hs new superprocrastinator mysecretpassword "Stop procrastinating"`
+`runhaskell haskerdeux.hs new "Stop procrastinating" superprocrastinator mysecretpassword`
 
 ##Proxy Support
 

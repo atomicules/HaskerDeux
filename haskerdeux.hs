@@ -32,7 +32,8 @@ main = do
 
 	(command:argList) <- getArgs
 	dispatch command $ todays_date:argList
-
+	--want to check if username and password supplied? anyway? Depends on length of arglist and command used
+	--As that way, if not their can read from netrc and add into argList
 
 today :: [String] -> IO ()
 today [todays_date, username, password] = withCurlDo $ do
@@ -44,7 +45,7 @@ today [todays_date, username, password] = withCurlDo $ do
 
 
 new :: [String] -> IO ()
-new [todays_date, username, password, todo] = withCurlDo $ do
+new [todays_date, todo, username, password] = withCurlDo $ do
 	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item[todo]="++todo, "todo_item[do_on]="++todays_date] ]
 	curl <- initialize
 	resp <- do_curl_ curl "https://teuxdeux.com/api/todo.json" opts :: IO CurlResponse
@@ -54,7 +55,7 @@ new [todays_date, username, password, todo] = withCurlDo $ do
 
 
 crossoff :: [String] -> IO ()
-crossoff [todays_date, username, password, number] = withCurlDo $ do
+crossoff [todays_date, number, username, password] = withCurlDo $ do
 	--Somehow convert number to item id. Since they aren't in memory, which?
 	--Need to get a list of todos again
 	--Need to do this DRYly at some point though
@@ -72,7 +73,7 @@ crossoff [todays_date, username, password, number] = withCurlDo $ do
 
 
 putoff :: [String] -> IO ()
-putoff [todays_date, username, password, number] = withCurlDo $ do
+putoff [todays_date, number, username, password] = withCurlDo $ do
 	let tomorrows_date = show (addDays 1 $ read todays_date::Day)
 	let opts1 = [CurlUserPwd $ username++":"++password] 
 	body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
@@ -88,7 +89,7 @@ putoff [todays_date, username, password, number] = withCurlDo $ do
 
 
 moveto :: [String] -> IO ()
-moveto [todays_date, username, password, number, new_date] = withCurlDo $ do
+moveto [todays_date, number, new_date, username, password] = withCurlDo $ do
 	let opts1 = [CurlUserPwd $ username++":"++password] 
 	body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
 	let tds = decodeJSON $ snd body :: [Teuxdeux]
