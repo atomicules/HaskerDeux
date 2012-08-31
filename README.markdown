@@ -22,10 +22,10 @@ For listing today's todos only (as that is all I want to see)
 
 This returns a numbered list, like so:
 
->0 - Write README for Haskerdeux
->1 - Write Blog post about Haskerdeux
->2 - Split development work in different branch
->3 - Perhaps do some actual work you are paid to do
+	0 - Write README for Haskerdeux
+	1 - Write Blog post about Haskerdeux
+	2 - Split development work in different branch
+	3 - Perhaps do some actual work you are paid to do
 
 You can use those numbers with the PutOff and CheckOff commands.
 
