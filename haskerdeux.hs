@@ -31,9 +31,14 @@ main = do
 	todays_date <- fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
 
 	(command:argList) <- getArgs
-	dispatch command $ todays_date:argList
-	--want to check if username and password supplied? anyway? Depends on length of arglist and command used
-	--As that way, if not their can read from netrc and add into argList
+	--If username and password not supplied read from netrc
+	if (command == "today" && length argList == 0) || ((command == "new" || command =="crossoff" || command == "putoff") && length argList == 1) || (command == "moveto" && length argList == 2)  
+		then do 
+			username <- fmap fst readnetrc
+			password <- fmap snd readnetrc
+			dispatch command $ todays_date:argList++[username, password]
+		else dispatch command $ todays_date:argList
+
 
 readnetrc = do
 	home <- getHomeDirectory
@@ -45,7 +50,7 @@ readnetrc = do
 		-- if entry is on multiple lines
 		else (last $ words $ netrc' !! 1, last $ words $ netrc' !! 2)
 		where getcred = \c -> (dropWhile (not . isInfixOf c) $ words $ head netrc') !! 1
-	print (username, password)
+	return (username, password)
 
 
 today :: [String] -> IO ()

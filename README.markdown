@@ -37,13 +37,25 @@ For putting off a task until tomorrow.
 
 E.g:
 
-`runhaskell haskerdeux.hs putoff 3 superprocrastinator mysecretpassword`
+`runhaskell haskerdeux.hs putoff 3`
+
+(Using username and password stored in `.netrc`)
 
 ###CrossOff
 
 For marking a task as complete
 
 `runhaskell haskerdeux.hs crossoff <tasknumber from today list> <username> <password>`
+
+###MoveTo
+
+For moving a task to another date.
+
+`runhaskell haskerdeux.hs moveto <tasknumber from today list> <date in YYYY:MM:DD> <username> <password>`
+
+E.g:
+
+`runhaskell haskerdeux.hs moveto 11 2012-09-01`
 
 ###New
 
@@ -54,6 +66,22 @@ For creating new tasks
 E.g:
 
 `runhaskell haskerdeux.hs new "Stop procrastinating" superprocrastinator mysecretpassword`
+
+(Supplying username and password on the command line)
+
+##Using .netrc For Storing Username and Password
+
+The `<username>` and `<password>` arguments are optional. If not supplied then it attempts to read them from `.netrc`. Just add an entry to `.netrc` as follows:
+
+	machine teuxdeux.com
+		login superprocrastinator
+		password mysecretpassword
+
+Or the single line format:
+
+	machine teuxdeux.com loging superprocrastinator password mysecretpassword
+
+It should work ok with either format. It won't work if you have spaces in your password though.
 
 ##Proxy Support
 
