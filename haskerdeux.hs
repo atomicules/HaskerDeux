@@ -54,11 +54,8 @@ readnetrc = do
 
 
 today :: [String] -> IO ()
-today [todays_date, username, password] = withCurlDo $ do
-	let opts = [CurlUserPwd $ username++":"++password] --http://stackoverflow.com/a/2140445/208793
-	body <- curlGetString "https://teuxdeux.com/api/list.json" opts
-	let tds = decodeJSON $ snd body :: [Teuxdeux]
-	let tdsf = filter (\td -> do_on td ==todays_date && done td == False) tds
+today [todays_date, username, password] = do
+	tdsf <- curlget [todays_date, username, password]
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ map (\td ->  todo td) tdsf --numbering from LYAH
 
 
@@ -71,11 +68,17 @@ new [todays_date, todo, username, password] = withCurlDo $ do
 		then putStrLn "Added!"
 		else putStrLn "Uh Oh! Didn't work!"
 
-curlpost [todays_date, number, curlpostfields, apiurl, okresponse, username, password] = withCurlDo $ do
+
+curlget [todays_date, username, password] = withCurlDo $ do
 	let opts1 = [CurlUserPwd $ username++":"++password] 
 	body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
 	let tds = decodeJSON $ snd body :: [Teuxdeux]
 	let tdsf = filter (\td -> do_on td ==todays_date && done td == False) tds
+	return tdsf
+	
+
+curlpost [todays_date, number, curlpostfields, apiurl, okresponse, username, password] = withCurlDo $ do
+	tdsf <- curlget [todays_date, username, password]
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item["++(show itemid)++"?]"++curlpostfields] ]
 	curl <- initialize
