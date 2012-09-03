@@ -53,20 +53,13 @@ readnetrc = do
 	return (username, password)
 
 
-today :: [String] -> IO ()
 today [todays_date, username, password] = do
 	tdsf <- curlget [todays_date, username, password]
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ map (\td ->  todo td) tdsf --numbering from LYAH
 
 
-new :: [String] -> IO ()
-new [todays_date, todo, username, password] = withCurlDo $ do
-	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item[todo]="++todo, "todo_item[do_on]="++todays_date] ]
-	curl <- initialize
-	resp <- do_curl_ curl "https://teuxdeux.com/api/todo.json" opts :: IO CurlResponse
-	if respCurlCode resp == CurlOK && respStatus resp == 200
-		then putStrLn "Added!"
-		else putStrLn "Uh Oh! Didn't work!"
+new [todays_date, todo, username, password] = do
+	curlpost [todays_date, todo, "https://teuxdeux.com/api/todo.json", "Added!", username, password] Nothing
 
 
 curlget [todays_date, username, password] = withCurlDo $ do
@@ -77,10 +70,13 @@ curlget [todays_date, username, password] = withCurlDo $ do
 	return tdsf
 	
 
-curlpost [todays_date, number, curlpostfields, apiurl, okresponse, username, password] = withCurlDo $ do
+curlpost [todays_date, curlpostdata, apiurl, okresponse, username, password] number = withCurlDo $ do
 	tdsf <- curlget [todays_date, username, password]
-	let itemid = Main.id $ tdsf!!(read number::Int)
-	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields ["todo_item["++(show itemid)++"?]"++curlpostfields] ]
+	let itemid = Main.id $ tdsf!!(read (fromJust number)::Int)
+	let curlpostfields = if isJust number
+		then CurlPostFields ["todo_item["++(show itemid)++"?]"++curlpostdata]
+		else CurlPostFields ["todo_item[todo]="++curlpostdata, "todo_item[do_on]="++todays_date]
+	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, curlpostfields]
 	curl <- initialize
 	resp <- do_curl_ curl apiurl opts :: IO CurlResponse
 	if respCurlCode resp == CurlOK && respStatus resp == 200
@@ -90,18 +86,16 @@ curlpost [todays_date, number, curlpostfields, apiurl, okresponse, username, pas
 
 crossoff :: [String] -> IO ()
 crossoff [todays_date, number, username, password] = do
-	curlpost [todays_date, number, "[done=1", "https://teuxdeux.com/api/update.json", "Crossed Off!", username, password]
+	curlpost [todays_date, "[done=1", "https://teuxdeux.com/api/update.json", "Crossed Off!", username, password](Just number)
 
 
-putoff :: [String] -> IO ()
 putoff [todays_date, number, username, password] = do
 	let tomorrows_date = show (addDays 1 $ read todays_date::Day)
-	curlpost [todays_date, number, "[do_on]="++tomorrows_date, "https://teuxdeux.com/api/update.json", "Put Off!", username, password]
+	curlpost [todays_date, "[do_on]="++tomorrows_date, "https://teuxdeux.com/api/update.json", "Put Off!", username, password] (Just number)
 
 
-moveto :: [String] -> IO ()
 moveto [todays_date, number, new_date, username, password] = do
-	curlpost [todays_date, number, "[do_on]="++new_date, "https://teuxdeux.com/api/update.json", "Moved!", username, password]
+	curlpost [todays_date, "[do_on]="++new_date, "https://teuxdeux.com/api/update.json", "Moved!", username, password] (Just number)
 
 
 --Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
