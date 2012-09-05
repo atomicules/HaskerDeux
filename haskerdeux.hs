@@ -26,10 +26,8 @@ dispatch "moveto" = moveto
 
 
 main = do 
-
 	--Get today's date. Need <- else get IO string
 	todays_date <- fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
-
 	(command:argList) <- getArgs
 	--If username and password not supplied read from netrc
 	if (command == "today" && length argList == 0) || ((command == "new" || command =="crossoff" || command == "putoff") && length argList == 1) || (command == "moveto" && length argList == 2)  
@@ -51,15 +49,6 @@ readnetrc = do
 		else (last $ words $ netrc' !! 1, last $ words $ netrc' !! 2)
 		where getcred = \c -> (dropWhile (not . isInfixOf c) $ words $ head netrc') !! 1
 	return (username, password)
-
-
-today [todays_date, username, password] = do
-	tdsf <- curlget [todays_date, username, password]
-	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ map (\td ->  todo td) tdsf --numbering from LYAH
-
-
-new [todays_date, todo, username, password] = do
-	curlpost [todays_date, todo, "https://teuxdeux.com/api/todo.json", "Added!", username, password] Nothing
 
 
 curlget [todays_date, username, password] = withCurlDo $ do
@@ -84,7 +73,15 @@ curlpost [todays_date, curlpostdata, apiurl, okresponse, username, password] num
 		else putStrLn "Uh Oh! Didn't work!"
 
 
-crossoff :: [String] -> IO ()
+today [todays_date, username, password] = do
+	tdsf <- curlget [todays_date, username, password]
+	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ map (\td ->  todo td) tdsf --numbering from LYAH
+
+
+new [todays_date, todo, username, password] = do
+	curlpost [todays_date, todo, "https://teuxdeux.com/api/todo.json", "Added!", username, password] Nothing
+
+
 crossoff [todays_date, number, username, password] = do
 	curlpost [todays_date, "[done=1", "https://teuxdeux.com/api/update.json", "Crossed Off!", username, password](Just number)
 
