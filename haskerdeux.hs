@@ -60,11 +60,12 @@ curlget [todays_date, username, password] = withCurlDo $ do
 	
 
 curlpost [todays_date, curlpostdata, apiurl, okresponse, username, password] number = withCurlDo $ do
-	tdsf <- curlget [todays_date, username, password]
-	let itemid = Main.id $ tdsf!!(read (fromJust number)::Int)
-	let curlpostfields = if isJust number
-		then CurlPostFields ["todo_item["++(show itemid)++"?]"++curlpostdata]
-		else CurlPostFields ["todo_item[todo]="++curlpostdata, "todo_item[do_on]="++todays_date]
+	curlpostfields <- if isJust number
+		then do
+			tdsf <- curlget [todays_date, username, password]
+			let itemid = Main.id $ tdsf!!(read (fromJust number)::Int)
+			return $ CurlPostFields ["todo_item["++(show itemid)++"?]"++curlpostdata]
+		else return $ CurlPostFields ["todo_item[todo]="++curlpostdata, "todo_item[do_on]="++todays_date]
 	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, curlpostfields]
 	curl <- initialize
 	resp <- do_curl_ curl apiurl opts :: IO CurlResponse
