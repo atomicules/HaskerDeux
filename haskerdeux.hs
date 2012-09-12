@@ -7,7 +7,6 @@ import System.IO.Error
 import Data.List
 import Data.List.Split --need to install
 import Network.Curl --need to install
-import Data.Word (Word32) --for use with Curl port
 import Control.Monad
 import Data.Maybe
 import Text.JSON --need to install for JSON
@@ -15,6 +14,7 @@ import Text.JSON.Generic --need to install for JSON
 import Data.Time
 import System.Locale (defaultTimeLocale)
 import System.Directory
+import Web.Encodings --need to install. Now depreciated, but I'm behind on GHC versions
 
 --Note to self: to run you type `runhaskell haskeduex.hs test "me" "this" "that"`, etc
 dispatch :: String -> [String] -> IO ()
@@ -79,8 +79,9 @@ today [todays_date, username, password] = do
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ map todo tdsf --numbering from LYAH
 
 
-new [todays_date, todo, username, password] = 
-	curlpost [todays_date, todo, "https://teuxdeux.com/api/todo.json", "Added!", username, password] Nothing
+new [todays_date, todo, username, password] = do 
+	let encodedtodo = encodeUrl todo
+	curlpost [todays_date, encodedtodo, "https://teuxdeux.com/api/todo.json", "Added!", username, password] Nothing
 
 
 crossoff [todays_date, number, username, password] = 
