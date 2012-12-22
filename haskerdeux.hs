@@ -16,13 +16,14 @@ import System.Locale (defaultTimeLocale)
 import System.Directory
 import Web.Encodings --need to install. Now depreciated, but I'm behind on GHC versions
 
---Note to self: to run you type `runhaskell haskeduex.hs test "me" "this" "that"`, etc
+--Note to self: to run you type `runhaskell haskerdeux.hs test "me" "this" "that"`, etc
 dispatch :: String -> [String] -> IO ()
 dispatch "today" = today
 dispatch "new" = new
 dispatch "crossoff" = crossoff
 dispatch "putoff" = putoff
 dispatch "moveto" = moveto
+dispatch "delete" = remove
 
 
 main = do 
@@ -30,7 +31,7 @@ main = do
 	todays_date <- fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
 	(command:argList) <- getArgs
 	--If username and password not supplied read from netrc
-	if (command == "today" && null argList) || (command `elem` ["new", "crossoff", "putoff"] && length argList == 1) || (command == "moveto" && length argList == 2)  
+	if (command == "today" && null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)  
 		then do 
 			username <- fmap fst readnetrc
 			password <- fmap snd readnetrc
@@ -74,6 +75,18 @@ curlpost [todays_date, curlpostdata, apiurl, okresponse, username, password] num
 		else putStrLn "Uh Oh! Didn't work!"
 
 
+curldelete [todays_date, curlpostdata, apiurl, okresponse, username, password] number = withCurlDo $ do
+	--Not really a DELETE, rather a POST supporting it. Means duplication of code, but keeps the curlpost above clean
+	tdsf <- curlget [todays_date, username, password]
+	let itemid = Main.id $ tdsf!!(read number::Int)
+	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields $ return curlpostdata]
+	curl <- initialize
+	resp <- do_curl_ curl (apiurl++(show itemid)) opts :: IO CurlResponse
+	if respCurlCode resp == CurlOK && respStatus resp == 200
+		then putStrLn okresponse
+		else putStrLn "Uh Oh! Didn't work!"
+
+
 today [todays_date, username, password] = do
 	tdsf <- curlget [todays_date, username, password]
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ map todo tdsf --numbering from LYAH
@@ -85,7 +98,7 @@ new [todays_date, todo, username, password] = do
 
 
 crossoff [todays_date, number, username, password] = 
-	curlpost [todays_date, "[done=1", "https://teuxdeux.com/api/update.json", "Crossed Off!", username, password](Just number)
+	curlpost [todays_date, "[done]=1", "https://teuxdeux.com/api/update.json", "Crossed Off!", username, password] (Just number)
 
 
 putoff [todays_date, number, username, password] = do
@@ -95,6 +108,10 @@ putoff [todays_date, number, username, password] = do
 
 moveto [todays_date, number, new_date, username, password] = 
 	curlpost [todays_date, "[do_on]="++new_date, "https://teuxdeux.com/api/update.json", "Moved!", username, password] (Just number)
+
+
+remove [todays_date, number, username, password] = 
+	curldelete [todays_date, "_method=delete", "https://teuxdeux.com/api/todo/", "Deleted!", username, password] number
 
 
 --Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson

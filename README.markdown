@@ -10,6 +10,8 @@ You need the following Haskell packages installed:
 - Network.Curl
 - Text.JSON
 
+I also suggest you compile it to use it - it's much faster to use that way. Just do `ghc --make haskerdeux.hs`. If you don't compile it then replace `./haskerdeux` in the examples below with `runhaskell haskerdeux.hs`.
+
 ##Features/Commands
 
 Haskerdeux currently includes the following commands: 
@@ -18,7 +20,7 @@ Haskerdeux currently includes the following commands:
 
 For listing today's todos only (as that is all I want to see)
 
-`runhaskell haskerdeux.hs today <username> <password>`
+`haskerdeux today <username> <password>`
 
 This returns a numbered list, like so:
 
@@ -29,45 +31,51 @@ This returns a numbered list, like so:
 
 You can use those numbers with the PutOff and CheckOff commands.
 
+###New
+
+For creating new tasks
+
+`haskerdeux new "<A todo item>" <username> <password>`
+
+E.g:
+
+`haskerdeux new "Stop procrastinating" superprocrastinator mysecretpassword`
+
+(Supplying username and password on the command line)
+
 ###PutOff
 
 For putting off a task until tomorrow.
 
-`runhaskell haskerdeux.hs putoff <tasknumber from today list> <username> <password>`
+`haskerdeux putoff <tasknumber from today list> <username> <password>`
 
 E.g:
 
-`runhaskell haskerdeux.hs putoff 3`
+`haskerdeux putoff 3`
 
 (Using username and password stored in `.netrc`)
-
-###CrossOff
-
-For marking a task as complete
-
-`runhaskell haskerdeux.hs crossoff <tasknumber from today list> <username> <password>`
 
 ###MoveTo
 
 For moving a task to another date.
 
-`runhaskell haskerdeux.hs moveto <tasknumber from today list> <date in YYYY:MM:DD> <username> <password>`
+`haskerdeux moveto <tasknumber from today list> <date in YYYY:MM:DD> <username> <password>`
 
 E.g:
 
-`runhaskell haskerdeux.hs moveto 11 2012-09-01`
+`haskerdeux moveto 11 2012-09-01`
 
-###New
+###CrossOff
 
-For creating new tasks
+For marking a task as complete
 
-`runhaskell haskerdeux.hs new "<A todo item>" <username> <password>`
+`haskerdeux crossoff <tasknumber from today list> <username> <password>`
 
-E.g:
+###Delete
 
-`runhaskell haskerdeux.hs new "Stop procrastinating" superprocrastinator mysecretpassword`
+For completely removing a task
 
-(Supplying username and password on the command line)
+`haskerdeux delete <tasknumber from today list> <username> <password>`
 
 ##Using .netrc For Storing Username and Password
 
@@ -88,7 +96,6 @@ It should work ok with either format. It won't work if you have spaces in your p
 I went with [Network.Curl](http://hackage.haskell.org/package/curl) because proxy support was a must for me and I couldn't figure it out (at least not using authentication) with things like http-enumerator or http-conduit. Anyway, I spent ages figuring out checking for environment variables and building the proxy options to Curl, but seems like there is no need: As long as you have the `https_proxy` environment variable set, Curl finds it by default and does it automatically. So even works where authentication is required. You just need something like the following in `.bashrc`, etc.
 
 `export proxy https_proxy="<username>:<password>@<proxyserveraddress>:<proxyport>"`
-
 
 ##Development
 
