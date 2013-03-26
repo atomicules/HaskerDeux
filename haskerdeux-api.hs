@@ -7,7 +7,6 @@ import System.IO.Error
 import Data.List
 import Data.List.Split --need to install
 import Network.Curl --need to install
-import Data.Word (Word32) --for use with Curl port
 import Control.Monad
 import Data.Maybe
 import Text.JSON --need to install for JSON
@@ -16,27 +15,40 @@ import Data.Time
 import System.Locale (defaultTimeLocale)
 
 --API Addresses
-
 api_user = "https://teuxdeux.com/api/user.json"
 api_list = "https://teuxdeux.com/api/list.json"
 api_update = "https://teuxdeux.com/api/update.json"
 api_todo = "https://teuxdeux.com/api/todo.json"
     
 
---to fake the approach of badboy's teuxdeux can just do:
---let client = (username, password)
---
+--Curl abstraction thingys
+curlget [apiurl, username, password] = withCurlDo $ do
+	let opts1 = [CurlUserPwd $ username++":"++password] 
+	body <- curlGetString api_url opts1
+	let tds = decodeJSON $ snd body :: [Teuxdeux]
+	return tds
+	
 
-resp client api = withCurlDo $ do
-	let username = fst client
-	    password = snd client
-	    opts = [CurlUserPwd $ username++":"++password]  --http://stackoverflow.com/a/2140445/208793
-	curlGetString api opts
+curlpost [apiurl, curlpostdata, okresponse, username, password] = withCurlDo $ do
+	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, curlpostdata]
+	curl <- initialize
+	resp <- do_curl_ curl apiurl opts :: IO CurlResponse
+	if respCurlCode resp == CurlOK && respStatus resp == 200
+		then putStrLn okresponse
+		else putStrLn "Uh Oh! Didn't work!"
 
-user client = withCurlDo $ do
-	resp client user
+
+curldelete [apiurl, curlpostdata, okresponse, username, password]  = withCurlDo $ do
+	--Not really a DELETE, rather a POST supporting it. Means duplication of code, but keeps the curlpost above clean
+	let opts = method_POST ++ [CurlUserPwd $ username++":"++password, CurlPostFields $ return curlpostdata]
+	curl <- initialize
+	resp <- do_curl_ curl (apiurl++(show itemid)) opts :: IO CurlResponse
+	if respCurlCode resp == CurlOK && respStatus resp == 200
+		then putStrLn okresponse
+		else putStrLn "Uh Oh! Didn't work!"
 
 
+--api methods
 todos client = withCurlDo $ do
 	body client list
 

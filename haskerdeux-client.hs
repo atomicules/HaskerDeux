@@ -1,27 +1,22 @@
-{-# LANGUAGE DeriveDataTypeable #-}
---HaskerDeux
 
 import System.Environment
 import System.IO
 import System.IO.Error
 import Data.List
 import Data.List.Split --need to install
-import Network.Curl --need to install
-import Data.Word (Word32) --for use with Curl port
 import Control.Monad
 import Data.Maybe
-import Text.JSON --need to install for JSON
-import Text.JSON.Generic --need to install for JSON
 import Data.Time
 import System.Locale (defaultTimeLocale)
 
 
---Note to self: to run you type `runhaskell haskeduex.hs test "me" "this" "that"`, etc
 dispatch :: String -> [String] -> IO ()
 dispatch "today" = today
 dispatch "new" = new
 dispatch "crossoff" = crossoff
 dispatch "putoff" = putoff
+dispatch "moveto" = moveto
+dispatch "delete" = delete
 
 
 main = do 
@@ -86,10 +81,3 @@ putoff [todays_date, username, password, number] = withCurlDo $ do
 		else putStrLn "Uh Oh! Didn't work!"
 
 
---Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
-data Teuxdeux = Teuxdeux {
-    id :: Integer,
-	do_on :: String, 
-	todo :: String,
-	done :: Bool
-} deriving (Eq, Show, Data, Typeable) 
