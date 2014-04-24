@@ -2,6 +2,11 @@
 
 Written with the dual purpose of being a learning exercise for Haskell and also because I really wanted a command line tool for [Teuxdeux](http://teuxdeux.com). As it stands this is a bit rough and ready, but it does work.
 
+##Status
+
+Abandonware. TeuxDeux released a Neux version and I waited a year but the corresponding new API did not come and I really missed command line access so I jumped ship to taskwarrior.
+
+
 ##Requirements
 
 You need the following Haskell packages installed:
