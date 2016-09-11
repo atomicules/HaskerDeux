@@ -6,6 +6,7 @@ import System.IO
 import System.IO.Error
 import Data.List
 import Data.List.Split --need to install
+import Data.Map
 import Network.Curl --need to install
 import Control.Monad
 import Data.Maybe
@@ -14,7 +15,7 @@ import Text.JSON.Generic --need to install for JSON
 import Data.Time
 import System.Locale (defaultTimeLocale)
 import System.Directory
-import Web.Encodings --need to install. Now depreciated, but I'm behind on GHC versions
+--import Web.Encodings --need to install. Now depreciated, but I'm behind on GHC versions. Is this actually used? Oh yeah for decodeJSON, but should be able to use Text.JSON instead to decode
 
 --Note to self: to run you type `runhaskell haskerdeux.hs test "me" "this" "that"`, etc
 dispatch :: String -> [String] -> IO ()
@@ -24,6 +25,8 @@ dispatch "crossoff" = crossoff
 dispatch "putoff" = putoff
 dispatch "moveto" = moveto
 dispatch "delete" = remove
+--Since we might want to force a login
+dispatch "login" = login
 
 
 main = do 
@@ -87,30 +90,66 @@ curldelete [todays_date, curlpostdata, apiurl, okresponse, username, password] n
 		else putStrLn "Uh Oh! Didn't work!"
 
 
-today [todays_date, username, password] = do
-	tdsf <- curlget [todays_date, username, password]
+getauthtoken = withCurlDo $ do
+	curl <- initialize
+	--Could use curlgetstring for this
+	let opts = method_GET ++ [CurlFollowLocation True, CurlCookieJar "haskerdeux.cookies", CurlVerbose True]
+	resp <- do_curl_ curl ("https://teuxdeux.com/login") opts :: IO CurlResponse
+	let body = respBody resp
+	let bodylines = lines body
+	let authline = dropWhile (not . isInfixOf "authenticity_token") bodylines
+	let authwords = words $ head authline
+	let authtokenword = stripPrefix "value=\"" $ last authwords
+	let revauthtokenword = reverse $ fromJust authtokenword
+	let authtoken = reverse $ fromJust $ stripPrefix ">\"" revauthtokenword
+	home <- getHomeDirectory
+	writeFile (home ++ "/.haskerdeux-token") authtoken
+
+--let headers = Data.Map.fromList(respHeaders resp)
+--let cookietuple = fromJust $ Data.Map.lookup "Set-Cookie" headers
+--let cookie = head $ Data.List.Split.splitOn ";" $ (Data.List.Split.splitOn "=" cookietuple)!!1
+--writeFile ".haskerdeux-cookie" cookie
+
+login [username, password] = withCurlDo $ do
+	getauthoken
+	authtoken <- readFile (home ++ "/.haskerdeux-token")
+    let curlpostfields = CurlPostFields ["username=" ++ username, "password=" ++ password, "authenticity_token=" ++ authtoken] 
+	let curlheaders = CurlHttpHeaders ["X-CSRF-Token: " ++ authtoken]
+	--let opts = method_POST ++ [CurlCookie $ "rack.session=" ++ cookie,  curlpostfields, curlheaders, CurlFollowLocation True]
+	let opts = method_POST ++ [CurlCookieFile "haskerdeux.cookies", CurlCookieJar "haskerdeux.cookies", curlpostfields, curlheaders, CurlFollowLocation True]
+	resp <- do_curl_ curl "https://teuxdeux.com/login" opts :: IO CurlResponse
+	--let opts = method_GET ++ [CurlCookie $ "rack.session=" ++ cookie, curlheaders]
+
+
+--
+	let opts = method_GET ++ [CurlCookieFile "haskerdeux.cookies", curlheaders]
+	resp <- do_curl_ curl "https://teuxdeux.com/api/v1/todos/calendar?begin_date=2016-08-16&end_date=2016-08-17" opts :: IO CurlResponse
+
+
+today [todays_date] = do
+	tdsf <- curlget [todays_date]
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ map todo tdsf --numbering from LYAH
 
 
-new [todays_date, todo, username, password] = do 
+new [todays_date, todo] = do 
 	let encodedtodo = encodeUrl todo
 	curlpost [todays_date, encodedtodo, "https://teuxdeux.com/api/todo.json", "Added!", username, password] Nothing
 
 
-crossoff [todays_date, number, username, password] = 
+crossoff [todays_date, number] = 
 	curlpost [todays_date, "[done]=1", "https://teuxdeux.com/api/update.json", "Crossed Off!", username, password] (Just number)
 
 
-putoff [todays_date, number, username, password] = do
+putoff [todays_date, number] = do
 	let tomorrows_date = show (addDays 1 $ read todays_date::Day)
 	curlpost [todays_date, "[do_on]="++tomorrows_date, "https://teuxdeux.com/api/update.json", "Put Off!", username, password] (Just number)
 
 
-moveto [todays_date, number, new_date, username, password] = 
+moveto [todays_date, number, new_date] = 
 	curlpost [todays_date, "[do_on]="++new_date, "https://teuxdeux.com/api/update.json", "Moved!", username, password] (Just number)
 
 
-remove [todays_date, number, username, password] = 
+remove [todays_date, number] = 
 	curldelete [todays_date, "_method=delete", "https://teuxdeux.com/api/todo/", "Deleted!", username, password] number
 
 
