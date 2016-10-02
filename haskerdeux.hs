@@ -20,19 +20,20 @@ import System.Directory
 import Network.URI.Encode --need to install
 
 --Note to self: to run you type `runhaskell haskerdeux.hs test "me" "this" "that"`, etc
-dispatch :: String -> [String] -> IO ()
-dispatch "today" = today
-dispatch "new" = new
-dispatch "crossoff" = crossoff
-dispatch "putoff" = putoff
-dispatch "moveto" = moveto
-dispatch "delete" = remove
+dispatch :: String -> (Curl, [String]) -> IO ()
+--dispatch "today" = today
+--dispatch "new" = new
+--dispatch "crossoff" = crossoff
+--dispatch "putoff" = putoff
+--dispatch "moveto" = moveto
+--dispatch "delete" = remove
 --Since we might want to force a login
 dispatch "login" = login
 dispatch "test" = test
 
 
-main = do 
+main = withCurlDo $ do 
+	curl <- initialize
 	--Get today's date. Need <- else get IO string
 	todays_date <- fmap (formatTime defaultTimeLocale "%Y-%m-%d") getCurrentTime
 	(command:argList) <- getArgs
@@ -41,23 +42,23 @@ main = do
 		then do
 			username <- fmap fst readnetrc
 			password <- fmap snd readnetrc
-			dispatch command $ [username, password]
+			dispatch command $ (curl, [username, password])
 		else
 			return()
 	if (command == "login" && length argList == 2)
 		then do
 			let [username, password] = argList
-			dispatch command $ [username, password]
+			dispatch command $ (curl, [username, password])
 		else
 			return()
 	if (command == "today" && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)
 		then do
-			dispatch command $ todays_date:argList
+			dispatch command $ (curl, todays_date:argList)
 		else
 			return()
 	if (command == "test")
 		then do
-			dispatch command $ ["one", "two"]
+			dispatch command $ (curl, ["one", "two"])
 		else
 			return()
 
@@ -110,12 +111,7 @@ curldelete [todays_date, curlpostdata, apiurl, okresponse] number = withCurlDo $
 		else putStrLn "Uh Oh! Didn't work!"
 
 
-getauthtoken = withCurlDo $ do
-	curl <- initialize
-	--Could use curlgetstring for this
-	let opts = method_GET ++ [CurlFollowLocation True, CurlCookieJar "haskerdeux.cookies", CurlVerbose True]
-	resp <- do_curl_ curl ("https://teuxdeux.com/login") opts :: IO CurlResponse
-	let body = respBody resp
+getauthtoken body = do
 	let bodylines = lines body
 	let authline = dropWhile (not . isInfixOf "authenticity_token") bodylines
 	let authwords = words $ head authline
@@ -123,6 +119,7 @@ getauthtoken = withCurlDo $ do
 	let revauthtokenword = reverse $ fromJust authtokenword
 	let authtoken = reverse $ fromJust $ stripPrefix ">\"" revauthtokenword
 	home <- getHomeDirectory
+	putStrLn authtoken
 	writeFile (home ++ "/.haskerdeux-token") authtoken
 
 --let headers = Data.Map.fromList(respHeaders resp)
@@ -130,25 +127,30 @@ getauthtoken = withCurlDo $ do
 --let cookie = head $ Data.List.Split.splitOn ";" $ (Data.List.Split.splitOn "=" cookietuple)!!1
 --writeFile ".haskerdeux-cookie" cookie
 
-login [username, password] = withCurlDo $ do
-	getauthtoken
+login (curl, [username, password]) = do
+	--Think will have to logon every time we do anything to keep a valid session? Maybe just one curl object?
+	let opts = method_GET ++ [CurlFollowLocation True, CurlCookieJar "haskerdeux.cookies", CurlVerbose True]
+	resp <- do_curl_ curl ("https://teuxdeux.com/login") opts :: IO CurlResponse
+	let body = respBody resp
+	getauthtoken body
 	home <- getHomeDirectory
 	authtoken <- readFile (home ++ "/.haskerdeux-token")
-	curl <- initialize
 	let curlpostfields = CurlPostFields ["username=" ++ username, "password=" ++ password, "authenticity_token=" ++ authtoken] 
 	let curlheaders = CurlHttpHeaders ["X-CSRF-Token: " ++ authtoken]
 	--let opts = method_POST ++ [CurlCookie $ "rack.session=" ++ cookie,  curlpostfields, curlheaders, CurlFollowLocation True]
-	let opts = method_POST ++ [CurlCookieFile "haskerdeux.cookies", CurlCookieJar "haskerdeux.cookies", curlpostfields, curlheaders, CurlFollowLocation True]
+	let opts = method_POST ++ [CurlCookieFile "haskerdeux.cookies", CurlCookieJar "haskerdeux.cookies", curlpostfields, curlheaders, CurlFollowLocation True, CurlVerbose True]
 	resp <- do_curl_ curl "https://teuxdeux.com/login" opts :: IO CurlResponse
 	return()
 	--let opts = method_GET ++ [CurlCookie $ "rack.session=" ++ cookie, curlheaders]
 
 
 --
-test [_nothing, _matters] = withCurlDo $ do
+test (curl, [_nothing, _matters]) = do
+	username <- fmap fst readnetrc
+	password <- fmap snd readnetrc
+	login (curl, [username, password])
 	home <- getHomeDirectory
 	authtoken <- readFile (home ++ "/.haskerdeux-token")
-	curl <- initialize
 	let curlheaders = CurlHttpHeaders ["X-CSRF-Token: " ++ authtoken]
 	let opts = method_GET ++ [CurlCookieFile "haskerdeux.cookies", CurlCookieJar "haskerdeux.cookies", curlheaders, CurlVerbose True]
 	resp <- do_curl_ curl "https://teuxdeux.com/api/v1/todos/calendar?begin_date=2016-08-16&end_date=2016-08-17" opts :: IO CurlResponse
@@ -156,32 +158,32 @@ test [_nothing, _matters] = withCurlDo $ do
 
 
 --This needs to have two args to fit dispatch
-today [todays_date, ""] = do
-	tdsf <- curlget todays_date
-	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ Data.List.map text tdsf --numbering from LYAH
-
-
-new [todays_date, todo] = do 
-	let encodedtodo = Network.URI.Encode.encode todo
-	curlpost [todays_date, encodedtodo, "https://teuxdeux.com/api/todo.json", "Added!"] Nothing
-
-
-crossoff [todays_date, number] = 
-	curlpost [todays_date, "[done]=1", "https://teuxdeux.com/api/update.json", "Crossed Off!"] (Just number)
-
-
-putoff [todays_date, number] = do
-	let tomorrows_date = show (addDays 1 $ read todays_date::Day)
-	curlpost [todays_date, "[do_on]="++tomorrows_date, "https://teuxdeux.com/api/update.json", "Put Off!"] (Just number)
-
-
-moveto [todays_date, number, new_date] = 
-	curlpost [todays_date, "[do_on]="++new_date, "https://teuxdeux.com/api/update.json", "Moved!"] (Just number)
-
-
-remove [todays_date, number] = 
-	curldelete [todays_date, "_method=delete", "https://teuxdeux.com/api/todo/", "Deleted!"] number
-
+--today [todays_date, ""] = do
+--	tdsf <- curlget todays_date
+--	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ Data.List.map text tdsf --numbering from LYAH
+--
+--
+--new [todays_date, todo] = do 
+--	let encodedtodo = Network.URI.Encode.encode todo
+--	curlpost [todays_date, encodedtodo, "https://teuxdeux.com/api/todo.json", "Added!"] Nothing
+--
+--
+--crossoff [todays_date, number] = 
+--	curlpost [todays_date, "[done]=1", "https://teuxdeux.com/api/update.json", "Crossed Off!"] (Just number)
+--
+--
+--putoff [todays_date, number] = do
+--	let tomorrows_date = show (addDays 1 $ read todays_date::Day)
+--	curlpost [todays_date, "[do_on]="++tomorrows_date, "https://teuxdeux.com/api/update.json", "Put Off!"] (Just number)
+--
+--
+--moveto [todays_date, number, new_date] = 
+--	curlpost [todays_date, "[do_on]="++new_date, "https://teuxdeux.com/api/update.json", "Moved!"] (Just number)
+--
+--
+--remove [todays_date, number] = 
+--	curldelete [todays_date, "_method=delete", "https://teuxdeux.com/api/todo/", "Deleted!"] number
+--
 
 --Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
 data Teuxdeux = Teuxdeux {
