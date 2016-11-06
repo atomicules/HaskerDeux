@@ -61,7 +61,7 @@ readnetrc = do
 
 curlget (token, todays_date) = do
 	let curlheader = "X-CSRF-Token: " ++ token
-	body <- readProcess "curl" ["-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++todays_date++"&end_date="++todays_date] []
+	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++todays_date++"&end_date="++todays_date] []
 	--let opts1 = [] 
 	--body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
 	let tds = decodeJSON body :: [Teuxdeux]
@@ -105,7 +105,7 @@ curlput (token, [todays_date, json, apiurl, okresponse]) number = do
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	--let curlpostfields = return $ CurlPostFields [json] --try json here
 	let curlheader = "X-CSRF-Token: " ++ token
-	body <- readProcess "curl" ["-XPUT", apiurl++(show itemid), "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
+	body <- readProcess "curl" ["-s", "-XPUT", apiurl++(show itemid), "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
 	--how to check response? For now that will make parsing hard so let it fail
 	--just check body contains stuff?
 	if isInfixOf "done_updated_at" body
@@ -127,14 +127,14 @@ getauthtoken body = do
 
 login [username, password] = do
 	--need a separate curlget here as no token, etc. Optioal args?
-	body <- readProcess "curl" ["-L", "-c", "haskerdeux.cookies", "https://teuxdeux.com/login"] []
+	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "https://teuxdeux.com/login"] []
 	token <- getauthtoken body
 	--home <- getHomeDirectory
 	--authtoken <- readFile (home ++ "/.haskerdeux-token")
 	--can probably use one post?
 	let curlheader = "X-CSRF-Token: " ++ token
 	let curlpostfields = "username=" ++ username ++ "&password=" ++ password ++ "&authenticity_token=" ++ token
-	body <- readProcess "curl" ["-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-d", curlpostfields, "https://teuxdeux.com/login"] []
+	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-d", curlpostfields, "https://teuxdeux.com/login"] []
 	return token
 
 
