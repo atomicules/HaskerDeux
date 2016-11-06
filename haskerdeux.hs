@@ -4,10 +4,10 @@
 import System.Environment
 import System.IO
 import System.IO.Error
+import System.Process
 import Data.List
 import Data.List.Split --need to install
 import Data.Map
-import Network.Curl --need to install
 import Control.Monad
 import Data.Maybe
 import Text.JSON --need to install for JSON
@@ -21,7 +21,7 @@ import System.Directory
 import Network.URI.Encode --need to install
 
 --Note to self: to run you type `runhaskell haskerdeux.hs test "me" "this" "that"`, etc
-dispatch :: String -> (Curl, String, [String]) -> IO ()
+dispatch :: String -> (String, [String]) -> IO()
 dispatch "today" = today
 --dispatch "new" = new
 dispatch "crossoff" = crossoff
@@ -29,21 +29,18 @@ dispatch "crossoff" = crossoff
 --dispatch "moveto" = moveto
 --dispatch "delete" = remove
 --Since we might want to force a login
-dispatch "test" = test
 
 
-main = withCurlDo $ do 
-	curl <- initialize
-	--Get today's date. Need <- else get IO string
+main = do 
 	time <- getClockTime >>= toCalendarTime --https://wiki.haskell.org/Unix_tools/Date
 	let todays_date = formatCalendarTime defaultTimeLocale "%Y-%m-%d" time
 	(command:argList) <- getArgs
-	if (command == "today" && Data.List.null argList) || (command == "test" && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)  
+	if (command == "today" && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)  
 		then do 
 			username <- fmap fst readnetrc
 			password <- fmap snd readnetrc
-			token <- login (curl, [username, password])
-			dispatch command (curl, token, todays_date:argList)
+			token <- login [username, password]
+			dispatch command (token, todays_date:argList)
 		else
 			return()
 			--I can't be bothered to do credentials any other way than .netrc
@@ -62,13 +59,12 @@ readnetrc = do
 	return (username, password)
 
 
-curlget (curl, token, todays_date) = do
-	let curlheaders = CurlHttpHeaders ["X-CSRF-Token: " ++ token]
-	let opts = method_GET ++ [CurlCookieFile "haskerdeux.cookies", CurlCookieJar "haskerdeux.cookies", curlheaders, CurlVerbose False]
-	resp <- do_curl_ curl ("https://teuxdeux.com/api/v1/todos/calendar?begin_date="++todays_date++"&end_date="++todays_date) opts :: IO CurlResponse
+curlget (token, todays_date) = do
+	let curlheader = "X-CSRF-Token: " ++ token
+	body <- readProcess "curl" ["-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++todays_date++"&end_date="++todays_date] []
 	--let opts1 = [] 
 	--body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
-	let tds = decodeJSON $ respBody resp :: [Teuxdeux]
+	let tds = decodeJSON body :: [Teuxdeux]
 	let tdsf = Data.List.filter (\td -> current_date td == todays_date && not (done td)) tds
 	return tdsf
 	
@@ -100,18 +96,19 @@ curlget (curl, token, todays_date) = do
 --		then putStrLn okresponse
 --		else putStrLn "Uh Oh! Didn't work!"
 
-curlput (curl, token, [todays_date, json, apiurl, okresponse]) number = do
+curlput (token, [todays_date, json, apiurl, okresponse]) number = do
 	--Need the json we are PUTTING somewhere in here
-	tdsf <- curlget (curl, token, todays_date)
+	tdsf <- curlget (token, todays_date)
 	--Need some way to post the body.
 	--Need headers for posting json "Content-Type: application/json"
 	-- -d ""
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	--let curlpostfields = return $ CurlPostFields [json] --try json here
-	let curlheaders = CurlHttpHeaders ["X-CSRF-Token: " ++ token, "Content-Type: application/json", "Expect:", "Content-Length: 13"]
-	let opts = [CurlCookieFile "haskerdeux.cookies", CurlCookieJar "haskerdeux.cookies", curlheaders, CurlPostFields [json], CurlUpload True, CurlVerbose True]
-	resp <- do_curl_ curl (apiurl++(show itemid)) opts :: IO CurlResponse
-	if respCurlCode resp == CurlOK && respStatus resp == 200
+	let curlheader = "X-CSRF-Token: " ++ token
+	body <- readProcess "curl" ["-XPUT", apiurl++(show itemid), "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
+	--how to check response? For now that will make parsing hard so let it fail
+	--just check body contains stuff?
+	if isInfixOf "done_updated_at" body
 		then putStrLn okresponse
 		else putStrLn "Uh Oh! Didn't work!"
 
@@ -128,29 +125,21 @@ getauthtoken body = do
 	return authtoken
 
 
-login (curl, [username, password]) = do
-	let opts = method_GET ++ [CurlFollowLocation True, CurlCookieJar "haskerdeux.cookies", CurlVerbose False]
-	resp <- do_curl_ curl ("https://teuxdeux.com/login") opts :: IO CurlResponse
-	let body = respBody resp
+login [username, password] = do
+	--need a separate curlget here as no token, etc. Optioal args?
+	body <- readProcess "curl" ["-L", "-c", "haskerdeux.cookies", "https://teuxdeux.com/login"] []
 	token <- getauthtoken body
 	--home <- getHomeDirectory
 	--authtoken <- readFile (home ++ "/.haskerdeux-token")
-	let curlpostfields = CurlPostFields ["username=" ++ username, "password=" ++ password, "authenticity_token=" ++ token] 
-	let curlheaders = CurlHttpHeaders ["X-CSRF-Token: " ++ token]
-	let opts = method_POST ++ [CurlCookieFile "haskerdeux.cookies", CurlCookieJar "haskerdeux.cookies", curlpostfields, curlheaders, CurlFollowLocation True, CurlVerbose False]
-	resp <- do_curl_ curl "https://teuxdeux.com/login" opts :: IO CurlResponse
+	--can probably use one post?
+	let curlheader = "X-CSRF-Token: " ++ token
+	let curlpostfields = "username=" ++ username ++ "&password=" ++ password ++ "&authenticity_token=" ++ token
+	body <- readProcess "curl" ["-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-d", curlpostfields, "https://teuxdeux.com/login"] []
 	return token
 
 
-test (curl, token, [todays_date]) = do
-	let curlheaders = CurlHttpHeaders ["X-CSRF-Token: " ++ token]
-	let opts = method_GET ++ [CurlCookieFile "haskerdeux.cookies", CurlCookieJar "haskerdeux.cookies", curlheaders, CurlVerbose True]
-	resp <- do_curl_ curl ("https://teuxdeux.com/api/v1/todos/calendar?begin_date="++todays_date++"&end_date="++todays_date) opts :: IO CurlResponse
-	putStr $ respBody resp
-
-
-today (curl, token, [todays_date]) = do
-	tdsf <- curlget (curl, token, todays_date)
+today (token, [todays_date]) = do
+	tdsf <- curlget (token, todays_date)
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ Data.List.map text tdsf --numbering from LYAH
 
 
@@ -159,10 +148,11 @@ today (curl, token, [todays_date]) = do
 --	curlpost [todays_date, encodedtodo, "https://teuxdeux.com/api/todo.json", "Added!"] Nothing
 --
 --
-crossoff (curl, token, [todays_date, number]) = 
-	curlput (curl, token, [todays_date, "{ \"done\": true }", "https://teuxdeux.com/api/v1/todos/", "Crossed Off!"]) number
+crossoff (token, [todays_date, number]) = 
+	curlput (token, [todays_date, "{ \"done\": true }", "https://teuxdeux.com/api/v1/todos/", "Crossed Off!"]) number
 	-- is a PUT to https://teuxdeux.com/api/v1/todos/42396076
 	--should just be able to do "done": true, but might need whole object...
+	--check for retured body
 --
 --putoff (curl, [todays_date, number]) = do
 --	let tomorrows_date = show (addDays 1 $ read todays_date::Day)
