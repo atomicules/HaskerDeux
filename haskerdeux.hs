@@ -126,16 +126,23 @@ getauthtoken body = do
 
 
 login [username, password] = do
-	--need a separate curlget here as no token, etc. Optioal args?
-	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "https://teuxdeux.com/login"] []
-	token <- getauthtoken body
-	--home <- getHomeDirectory
-	--authtoken <- readFile (home ++ "/.haskerdeux-token")
-	--can probably use one post?
-	let curlheader = "X-CSRF-Token: " ++ token
-	let curlpostfields = "username=" ++ username ++ "&password=" ++ password ++ "&authenticity_token=" ++ token
-	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-d", curlpostfields, "https://teuxdeux.com/login"] []
-	return token
+	--See if we have a token, then to clear we can just delete the file
+	home <- getHomeDirectory
+	--handle error
+	check <- doesFileExist (home ++ "/.haskerdeux-token")
+	if check
+		then do
+			token <- readFile (home ++ "/.haskerdeux-token")
+			return token
+		else do
+			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "https://teuxdeux.com/login"] []
+			token <- getauthtoken body
+			writeFile (home ++ "/.haskerdeux-token") token
+			--can probably use one post?
+			let curlheader = "X-CSRF-Token: " ++ token
+			let curlpostfields = "username=" ++ username ++ "&password=" ++ password ++ "&authenticity_token=" ++ token
+			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-d", curlpostfields, "https://teuxdeux.com/login"] []
+			return token
 
 
 today (token, [todays_date]) = do
