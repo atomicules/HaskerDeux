@@ -27,7 +27,7 @@ dispatch "today" = today
 dispatch "crossoff" = crossoff
 --dispatch "putoff" = putoff
 --dispatch "moveto" = moveto
---dispatch "delete" = remove
+dispatch "delete" = remove
 --Since we might want to force a login
 
 
@@ -84,17 +84,17 @@ curlget (token, todays_date) = do
 --		else putStrLn "Uh Oh! Didn't work!"
 --
 --
---curldelete [todays_date, apiurl, okresponse] number = withCurlDo $ do
---	--Not really a DELETE, rather a POST supporting it. Means duplication of code, but keeps the curlpost above clean
---	tdsf <- curlget todays_date
---	let itemid = Main.id $ tdsf!!(read number::Int)
---	let curlpostfields = return $ CurlPostFields ["_method=delete"]
---	let opts = method_POST ++ [curlpostfields]
---	curl <- initialize
---	resp <- do_curl_ curl (apiurl++(show itemid)) opts :: IO CurlResponse
---	if respCurlCode resp == CurlOK && respStatus resp == 200
---		then putStrLn okresponse
---		else putStrLn "Uh Oh! Didn't work!"
+curldelete (token, [todays_date, apiurl, okresponse]) number = do
+	tdsf <- curlget (token, todays_date)
+	let itemid = Main.id $ tdsf!!(read number::Int)
+	let curlheader = "X-CSRF-Token: " ++ token
+	body <- readProcess "curl" ["-s", "-XDELETE", apiurl++(show itemid), "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader] []
+    --putStrLn okresponse
+	return()
+	-- what does the response say?
+    -- if respCurlCode resp == CurlOK && respStatus resp == 200
+    -- 	then putStrLn okresponse
+    -- 	else putStrLn "Uh Oh! Didn't work!"
 
 curlput (token, [todays_date, json, apiurl, okresponse]) number = do
 	--Need the json we are PUTTING somewhere in here
@@ -170,8 +170,8 @@ crossoff (token, [todays_date, number]) =
 --	curlpost [todays_date, "[do_on]="++new_date, "https://teuxdeux.com/api/update.json", "Moved!"] (Just number)
 --
 --
---remove (curl, [todays_date, number]) = 
---	curldelete [todays_date, "_method=delete", "https://teuxdeux.com/api/todo/", "Deleted!"] number
+remove (token, [todays_date, number]) = 
+	curldelete (token, [todays_date, "https://teuxdeux.com/api/v1/todos/", "Deleted!"]) number
 
 
 --Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
