@@ -12,7 +12,7 @@ import Control.Monad
 import Data.Maybe
 import Text.JSON --need to install for JSON
 import Text.JSON.Generic --need to install for JSON
---import Data.Time --Seriously datA.time? This doesn't work for me now. At least 3 years out of sync!
+import Data.Time
 import System.Time
 import System.Locale (defaultTimeLocale)
 import System.Directory
@@ -25,8 +25,8 @@ dispatch :: String -> (String, [String]) -> IO()
 dispatch "today" = today
 --dispatch "new" = new
 dispatch "crossoff" = crossoff
---dispatch "putoff" = putoff
---dispatch "moveto" = moveto
+dispatch "putoff" = putoff
+dispatch "moveto" = moveto
 dispatch "delete" = remove
 --Since we might want to force a login
 
@@ -35,8 +35,8 @@ main = do
 	time <- getClockTime >>= toCalendarTime --https://wiki.haskell.org/Unix_tools/Date
 	let todays_date = formatCalendarTime defaultTimeLocale "%Y-%m-%d" time
 	(command:argList) <- getArgs
-	if (command == "today" && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)  
-		then do 
+	if (command == "today" && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)
+		then do
 			username <- fmap fst readnetrc
 			password <- fmap snd readnetrc
 			token <- login [username, password]
@@ -69,21 +69,20 @@ curlget (token, todays_date) = do
 	return tdsf
 	
 
---curlpost [todays_date, curlpostdata, apiurl, okresponse] number = withCurlDo $ do
---	curlpostfields <- if isJust number
---		then do
---			tdsf <- curlget todays_date
---			let itemid = Main.id $ tdsf!!(read (fromJust number)::Int)
---			return $ CurlPostFields ["todo_item["++show itemid++"?]"++curlpostdata]
---		else return $ CurlPostFields ["todo_item[todo]="++curlpostdata, "todo_item[do_on]="++todays_date]
---	let opts = method_POST ++ [curlpostfields]
---	curl <- initialize
---	resp <- do_curl_ curl apiurl opts :: IO CurlResponse
---	if respCurlCode resp == CurlOK && respStatus resp == 200
---		then putStrLn okresponse
---		else putStrLn "Uh Oh! Didn't work!"
---
---
+curlpost (token, [todays_date, key, value, apiurl, okresponse]) number = do
+	tdsf <- curlget (token, todays_date)
+	let itemid = Main.id $ tdsf!!(read number::Int)
+	let curlheader = "X-CSRF-Token: " ++ token
+	--Can be much improved, but will do for now:
+	let json = "{ \"ids\" : [\""++(show itemid)++"\"], \""++key++"\" : \""++value++"\"}"
+	body <- readProcess "curl" ["-s", "-XPOST", apiurl, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
+	--just check body contains stuff?
+	--putStrLn body
+	if isInfixOf "done_updated_at" body
+		then putStrLn okresponse
+		else putStrLn "Uh Oh! Didn't work!"
+
+
 curldelete (token, [todays_date, apiurl, okresponse]) number = do
 	tdsf <- curlget (token, todays_date)
 	let itemid = Main.id $ tdsf!!(read number::Int)
@@ -155,22 +154,23 @@ today (token, [todays_date]) = do
 --	curlpost [todays_date, encodedtodo, "https://teuxdeux.com/api/todo.json", "Added!"] Nothing
 --
 --
-crossoff (token, [todays_date, number]) = 
+crossoff (token, [todays_date, number]) =
 	curlput (token, [todays_date, "{ \"done\": true }", "https://teuxdeux.com/api/v1/todos/", "Crossed Off!"]) number
 	-- is a PUT to https://teuxdeux.com/api/v1/todos/42396076
 	--should just be able to do "done": true, but might need whole object...
 	--check for retured body
---
---putoff (curl, [todays_date, number]) = do
---	let tomorrows_date = show (addDays 1 $ read todays_date::Day)
---	curlpost [todays_date, "[do_on]="++tomorrows_date, "https://teuxdeux.com/api/update.json", "Put Off!"] (Just number)
---
---
---moveto (curl, [todays_date, number, new_date]) = 
---	curlpost [todays_date, "[do_on]="++new_date, "https://teuxdeux.com/api/update.json", "Moved!"] (Just number)
---
---
-remove (token, [todays_date, number]) = 
+
+putoff (token, [todays_date, number]) = do
+	let tomorrows_date = show (addDays 1 $ read todays_date::Data.Time.Day)
+	curlpost (token, [todays_date, "current_date", tomorrows_date, "https://teuxdeux.com/api/v1/todos/reposition/", "Put Off!"]) number
+
+
+moveto (token, [todays_date, number, new_date]) = do
+	--Need to figure out moving to bottom of a list
+	curlpost (token, [todays_date, "current_date", new_date, "https://teuxdeux.com/api/v1/todos/reposition", "Moved!"]) number
+
+
+remove (token, [todays_date, number]) =
 	curldelete (token, [todays_date, "https://teuxdeux.com/api/v1/todos/", "Deleted!"]) number
 
 
