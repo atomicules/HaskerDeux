@@ -16,19 +16,16 @@ import Data.Time
 import System.Time
 import System.Locale (defaultTimeLocale)
 import System.Directory
---import Web.Encodings --need to install. Now depreciated, but I'm behind on GHC versions. Is this actually used? Oh yeah for decodeJSON, but should be able to use Text.JSON instead to decode
---import Data.Text
 import Network.URI.Encode --need to install
 
 --Note to self: to run you type `runhaskell haskerdeux.hs test "me" "this" "that"`, etc
 dispatch :: String -> (String, [String]) -> IO()
 dispatch "today" = today
---dispatch "new" = new
+dispatch "new" = new
 dispatch "crossoff" = crossoff
 dispatch "putoff" = putoff
 dispatch "moveto" = moveto
 dispatch "delete" = remove
---Since we might want to force a login
 
 
 main = do 
@@ -70,11 +67,18 @@ curlget (token, todays_date) = do
 	
 
 curlpost (token, [todays_date, key, value, apiurl, okresponse]) number = do
-	tdsf <- curlget (token, todays_date)
-	let itemid = Main.id $ tdsf!!(read number::Int)
 	let curlheader = "X-CSRF-Token: " ++ token
 	--Can be much improved, but will do for now:
-	let json = "{ \"ids\" : [\""++(show itemid)++"\"], \""++key++"\" : \""++value++"\"}"
+	json <- if isJust number
+		then do
+			tdsf <- curlget (token, todays_date)
+			let itemid = Main.id $ tdsf!!(read (fromJust number)::Int)
+			let modjson = "{ \"ids\" : [\""++(show itemid)++"\"], \""++key++"\" : \""++value++"\"}"
+			return modjson
+		else do
+			--Can just straight return these strings, need to let them first
+			let newjson = "{ \"current_date\" : \""++todays_date++"\", \""++key++"\" : \""++value++"\"}"
+			return newjson
 	body <- readProcess "curl" ["-s", "-XPOST", apiurl, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
 	--just check body contains stuff?
 	--putStrLn body
@@ -149,25 +153,24 @@ today (token, [todays_date]) = do
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ Data.List.map text tdsf --numbering from LYAH
 
 
---new (curl, [todays_date, todo]) = do 
---	let encodedtodo = Network.URI.Encode.encode todo
---	curlpost [todays_date, encodedtodo, "https://teuxdeux.com/api/todo.json", "Added!"] Nothing
---
---
+new (token, [todays_date, todo]) = do 
+	--Need to figure out min to post, start_date or current_date
+	let encodedtodo = Network.URI.Encode.encode todo
+	curlpost (token, [todays_date, "text", todo, "https://teuxdeux.com/api/v1/todos/", "Added!"]) Nothing
+
+
 crossoff (token, [todays_date, number]) =
 	curlput (token, [todays_date, "{ \"done\": true }", "https://teuxdeux.com/api/v1/todos/", "Crossed Off!"]) number
-	-- is a PUT to https://teuxdeux.com/api/v1/todos/42396076
-	--should just be able to do "done": true, but might need whole object...
-	--check for retured body
+
 
 putoff (token, [todays_date, number]) = do
 	let tomorrows_date = show (addDays 1 $ read todays_date::Data.Time.Day)
-	curlpost (token, [todays_date, "current_date", tomorrows_date, "https://teuxdeux.com/api/v1/todos/reposition/", "Put Off!"]) number
+	curlpost (token, [todays_date, "current_date", tomorrows_date, "https://teuxdeux.com/api/v1/todos/reposition/", "Put Off!"]) (Just number)
 
 
 moveto (token, [todays_date, number, new_date]) = do
-	--Need to figure out moving to bottom of a list
-	curlpost (token, [todays_date, "current_date", new_date, "https://teuxdeux.com/api/v1/todos/reposition", "Moved!"]) number
+	--TODO: Need to figure out moving to bottom of a list
+	curlpost (token, [todays_date, "current_date", new_date, "https://teuxdeux.com/api/v1/todos/reposition", "Moved!"]) (Just number)
 
 
 remove (token, [todays_date, number]) =
