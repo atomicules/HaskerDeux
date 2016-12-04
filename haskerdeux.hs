@@ -9,6 +9,7 @@ import Data.List
 import Data.List.Split --need to install
 import Data.Map
 import Control.Monad
+import Control.Applicative
 import Data.Maybe
 import Text.JSON --need to install for JSON
 import Text.JSON.Generic --need to install for JSON
@@ -32,20 +33,16 @@ main = do
 	time <- getClockTime >>= toCalendarTime --https://wiki.haskell.org/Unix_tools/Date
 	let todays_date = formatCalendarTime defaultTimeLocale "%Y-%m-%d" time
 	(command:argList) <- getArgs
-	if (command == "today" && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)
-		then do
-			username <- fmap fst readnetrc
-			password <- fmap snd readnetrc
-			token <- login [username, password]
-			dispatch command (token, todays_date:argList)
-		else
-			return()
-			--I can't be bothered to do credentials any other way than .netrc
+	when ((command == "today" && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)) $ do
+		username <- fmap fst readnetrc
+		password <- fmap snd readnetrc
+		token <- login [username, password]
+		dispatch command (token, todays_date:argList)
 
 
 readnetrc = do
 	home <- getHomeDirectory
-	netrc <- fmap lines $ readFile (home ++ "/.netrc")
+	netrc <- lines Control.Applicative.<$> readFile (home ++ "/.netrc")
 	let netrc' = dropWhile (not . isInfixOf "teuxdeux") netrc
 	let (username, password) = if "login" `isInfixOf` head netrc'
 		-- if entry is on one line	
@@ -73,7 +70,7 @@ curlpost (token, [todays_date, key, value, apiurl, okresponse]) number = do
 		then do
 			tdsf <- curlget (token, todays_date)
 			let itemid = Main.id $ tdsf!!(read (fromJust number)::Int)
-			let modjson = "{ \"ids\" : [\""++(show itemid)++"\"], \""++key++"\" : \""++value++"\"}"
+			let modjson = "{ \"ids\" : [\""++show itemid++"\"], \""++key++"\" : \""++value++"\"}"
 			return modjson
 		else do
 			--Can just straight return these strings, need to let them first
@@ -82,7 +79,7 @@ curlpost (token, [todays_date, key, value, apiurl, okresponse]) number = do
 	body <- readProcess "curl" ["-s", "-XPOST", apiurl, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
 	--just check body contains stuff?
 	--putStrLn body
-	if isInfixOf "done_updated_at" body
+	if "done_updated_at" `isInfixOf` body
 		then putStrLn okresponse
 		else putStrLn "Uh Oh! Didn't work!"
 
@@ -91,7 +88,7 @@ curldelete (token, [todays_date, apiurl, okresponse]) number = do
 	tdsf <- curlget (token, todays_date)
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	let curlheader = "X-CSRF-Token: " ++ token
-	body <- readProcess "curl" ["-s", "-XDELETE", apiurl++(show itemid), "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader] []
+	body <- readProcess "curl" ["-s", "-XDELETE", apiurl++show itemid, "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader] []
     --putStrLn okresponse
 	return()
 	-- what does the response say?
@@ -108,10 +105,10 @@ curlput (token, [todays_date, json, apiurl, okresponse]) number = do
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	--let curlpostfields = return $ CurlPostFields [json] --try json here
 	let curlheader = "X-CSRF-Token: " ++ token
-	body <- readProcess "curl" ["-s", "-XPUT", apiurl++(show itemid), "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
+	body <- readProcess "curl" ["-s", "-XPUT", apiurl++show itemid, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
 	--how to check response? For now that will make parsing hard so let it fail
 	--just check body contains stuff?
-	if isInfixOf "done_updated_at" body
+	if "done_updated_at" `isInfixOf` body
 		then putStrLn okresponse
 		else putStrLn "Uh Oh! Didn't work!"
 
@@ -134,9 +131,8 @@ login [username, password] = do
 	--handle error
 	check <- doesFileExist (home ++ "/.haskerdeux-token")
 	if check
-		then do
-			token <- readFile (home ++ "/.haskerdeux-token")
-			return token
+		then
+			readFile (home ++ "/.haskerdeux-token")
 		else do
 			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "https://teuxdeux.com/login"] []
 			token <- getauthtoken body
@@ -168,7 +164,7 @@ putoff (token, [todays_date, number]) = do
 	curlpost (token, [todays_date, "current_date", tomorrows_date, "https://teuxdeux.com/api/v1/todos/reposition/", "Put Off!"]) (Just number)
 
 
-moveto (token, [todays_date, number, new_date]) = do
+moveto (token, [todays_date, number, new_date]) =
 	--TODO: Need to figure out moving to bottom of a list
 	curlpost (token, [todays_date, "current_date", new_date, "https://teuxdeux.com/api/v1/todos/reposition", "Moved!"]) (Just number)
 
