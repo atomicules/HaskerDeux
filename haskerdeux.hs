@@ -56,8 +56,6 @@ readnetrc = do
 curlget (token, todays_date) = do
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++todays_date++"&end_date="++todays_date] []
-	--let opts1 = [] 
-	--body <- curlGetString "https://teuxdeux.com/api/list.json" opts1
 	let tds = decodeJSON body :: [Teuxdeux]
 	let tdsf = Data.List.filter (\td -> current_date td == todays_date && not (done td)) tds
 	return tdsf
@@ -73,12 +71,10 @@ curlpost (token, [todays_date, key, value, apiurl, okresponse]) number = do
 			let modjson = "{ \"ids\" : [\""++show itemid++"\"], \""++key++"\" : \""++value++"\"}"
 			return modjson
 		else do
-			--Can just straight return these strings, need to let them first
+			--Can't just straight return these strings, need to let them first
 			let newjson = "{ \"current_date\" : \""++todays_date++"\", \""++key++"\" : \""++value++"\"}"
 			return newjson
 	body <- readProcess "curl" ["-s", "-XPOST", apiurl, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
-	--just check body contains stuff?
-	--putStrLn body
 	if "done_updated_at" `isInfixOf` body
 		then putStrLn okresponse
 		else putStrLn "Uh Oh! Didn't work!"
@@ -89,28 +85,22 @@ curldelete (token, [todays_date, apiurl, okresponse]) number = do
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-XDELETE", apiurl++show itemid, "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader] []
-    --putStrLn okresponse
 	return()
-	-- what does the response say?
+	-- TODO: what does the response say?
     -- if respCurlCode resp == CurlOK && respStatus resp == 200
     -- 	then putStrLn okresponse
     -- 	else putStrLn "Uh Oh! Didn't work!"
 
+
 curlput (token, [todays_date, json, apiurl, okresponse]) number = do
-	--Need the json we are PUTTING somewhere in here
 	tdsf <- curlget (token, todays_date)
-	--Need some way to post the body.
-	--Need headers for posting json "Content-Type: application/json"
-	-- -d ""
 	let itemid = Main.id $ tdsf!!(read number::Int)
-	--let curlpostfields = return $ CurlPostFields [json] --try json here
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-XPUT", apiurl++show itemid, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
-	--how to check response? For now that will make parsing hard so let it fail
-	--just check body contains stuff?
 	if "done_updated_at" `isInfixOf` body
 		then putStrLn okresponse
 		else putStrLn "Uh Oh! Didn't work!"
+
 
 getauthtoken body = do
 	let bodylines = lines body
@@ -119,16 +109,13 @@ getauthtoken body = do
 	let authtokenword = stripPrefix "value=\"" $ last authwords
 	let revauthtokenword = reverse $ fromJust authtokenword
 	let authtoken = reverse $ fromJust $ stripPrefix ">\"" revauthtokenword
-	--home <- getHomeDirectory
-	--putStrLn authtoken
-	--writeFile (home ++ "/.haskerdeux-token") authtoken
 	return authtoken
 
 
 login [username, password] = do
 	--See if we have a token, then to clear we can just delete the file
+	--TODO: handle that error
 	home <- getHomeDirectory
-	--handle error
 	check <- doesFileExist (home ++ "/.haskerdeux-token")
 	if check
 		then
@@ -150,7 +137,6 @@ today (token, [todays_date]) = do
 
 
 new (token, [todays_date, todo]) = do 
-	--Need to figure out min to post, start_date or current_date
 	let encodedtodo = Network.URI.Encode.encode todo
 	curlpost (token, [todays_date, "text", todo, "https://teuxdeux.com/api/v1/todos/", "Added!"]) Nothing
 
