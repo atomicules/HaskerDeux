@@ -43,13 +43,13 @@ main = do
 readnetrc = do
 	home <- getHomeDirectory
 	netrc <- lines Control.Applicative.<$> readFile (home ++ "/.netrc")
-	let netrc' = dropWhile (not . isInfixOf "teuxdeux") netrc
+	let netrc' = dropWhile (not . ("teuxdeux" `isInfixOf`)) netrc
 	let (username, password) = if "login" `isInfixOf` head netrc'
 		-- if entry is on one line	
 		then (getcred "login", getcred "password") 
 		-- if entry is on multiple lines
 		else (last $ words $ netrc' !! 1, last $ words $ netrc' !! 2)
-		where getcred c = dropWhile (not . isInfixOf c) (words $ head netrc') !! 1
+		where getcred c = dropWhile (not . (c `isInfixOf`)) (words $ head netrc') !! 1
 	return (username, password)
 
 
@@ -114,7 +114,7 @@ curlput (token, [todays_date, json, apiurl, okresponse]) number = do
 
 getauthtoken body = do
 	let bodylines = lines body
-	let authline = dropWhile (not . isInfixOf "authenticity_token") bodylines
+	let authline = dropWhile (not . ("authenticity_token" `isInfixOf`)) bodylines
 	let authwords = words $ head authline
 	let authtokenword = stripPrefix "value=\"" $ last authwords
 	let revauthtokenword = reverse $ fromJust authtokenword
