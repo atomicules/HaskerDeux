@@ -2,6 +2,7 @@
 
 Written with the dual purpose of being a learning exercise for Haskell and also because I really wanted a command line tool for [Teuxdeux](http://teuxdeux.com). As it stands this is a bit rough and ready, but it does work.
 
+It used to use Network.Curl, but I can't get that to work anymore so I'm doing straight system calls to curl which means it's not very Haskelly and ultimately a bit of a pointless use of Haskell, but it's for me, so there.
 
 ##Status
 
