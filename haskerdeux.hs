@@ -85,11 +85,9 @@ curldelete (token, [todays_date, apiurl, okresponse]) number = do
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-XDELETE", apiurl++show itemid, "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader] []
-	return()
-	-- TODO: what does the response say?
-    -- if respCurlCode resp == CurlOK && respStatus resp == 200
-    -- 	then putStrLn okresponse
-    -- 	else putStrLn "Uh Oh! Didn't work!"
+	if "done_updated_at" `isInfixOf` body
+		then putStrLn okresponse
+		else putStrLn "Uh Oh! Didn't work!"
 
 
 curlput (token, [todays_date, json, apiurl, okresponse]) number = do
