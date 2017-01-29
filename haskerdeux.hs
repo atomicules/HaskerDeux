@@ -22,6 +22,7 @@ import Network.URI.Encode --need to install
 --Note to self: to run you type `runhaskell haskerdeux.hs test "me" "this" "that"`, etc
 dispatch :: String -> (String, [String]) -> IO()
 dispatch "today" = today
+dispatch "tomorrow" = tomorrow
 dispatch "new" = new
 dispatch "crossoff" = crossoff
 dispatch "putoff" = putoff
@@ -33,7 +34,7 @@ main = do
 	time <- getClockTime >>= toCalendarTime --https://wiki.haskell.org/Unix_tools/Date
 	let todays_date = formatCalendarTime defaultTimeLocale "%Y-%m-%d" time
 	(command:argList) <- getArgs
-	when ((command == "today" && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)) $ do
+	when ((command `elem` ["today", "tomorrow"] && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)) $ do
 		username <- fmap fst readnetrc
 		password <- fmap snd readnetrc
 		token <- login [username, password]
@@ -53,26 +54,26 @@ readnetrc = do
 	return (username, password)
 
 
-curlget (token, todays_date) = do
+curlget (token, date) = do
 	let curlheader = "X-CSRF-Token: " ++ token
-	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++todays_date++"&end_date="++todays_date] []
+	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++date++"&end_date="++date] []
 	let tds = decodeJSON body :: [Teuxdeux]
-	let tdsf = Data.List.filter (\td -> current_date td == todays_date && not (done td)) tds
+	let tdsf = Data.List.filter (\td -> current_date td == date && not (done td)) tds
 	return tdsf
 	
 
-curlpost (token, [todays_date, key, value, apiurl, okresponse]) number = do
+curlpost (token, [date, key, value, apiurl, okresponse]) number = do
 	let curlheader = "X-CSRF-Token: " ++ token
 	--Can be much improved, but will do for now:
 	json <- if isJust number
 		then do
-			tdsf <- curlget (token, todays_date)
+			tdsf <- curlget (token, date)
 			let itemid = Main.id $ tdsf!!(read (fromJust number)::Int)
 			let modjson = "{ \"ids\" : [\""++show itemid++"\"], \""++key++"\" : \""++value++"\"}"
 			return modjson
 		else do
 			--Can't just straight return these strings, need to let them first
-			let newjson = "{ \"current_date\" : \""++todays_date++"\", \""++key++"\" : \""++value++"\"}"
+			let newjson = "{ \"current_date\" : \""++date++"\", \""++key++"\" : \""++value++"\"}"
 			return newjson
 	body <- readProcess "curl" ["-s", "-XPOST", apiurl, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
 	if "done_updated_at" `isInfixOf` body
@@ -80,8 +81,8 @@ curlpost (token, [todays_date, key, value, apiurl, okresponse]) number = do
 		else putStrLn "Uh Oh! Didn't work!"
 
 
-curldelete (token, [todays_date, apiurl, okresponse]) number = do
-	tdsf <- curlget (token, todays_date)
+curldelete (token, [date, apiurl, okresponse]) number = do
+	tdsf <- curlget (token, date)
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-XDELETE", apiurl++show itemid, "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader] []
@@ -90,8 +91,8 @@ curldelete (token, [todays_date, apiurl, okresponse]) number = do
 		else putStrLn "Uh Oh! Didn't work!"
 
 
-curlput (token, [todays_date, json, apiurl, okresponse]) number = do
-	tdsf <- curlget (token, todays_date)
+curlput (token, [date, json, apiurl, okresponse]) number = do
+	tdsf <- curlget (token, date)
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-XPUT", apiurl++show itemid, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
@@ -132,6 +133,12 @@ login [username, password] = do
 today (token, [todays_date]) = do
 	tdsf <- curlget (token, todays_date)
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ Data.List.map text tdsf --numbering from LYAH
+
+
+tomorrow (token, [todays_date]) = do
+	let tomorrows_date = show (addDays 1 $ read todays_date::Data.Time.Day)
+	tdsf <- curlget (token, tomorrows_date)
+	putStr $ unlines $ Data.List.map ("- " ++) $ Data.List.map text tdsf
 
 
 new (token, [todays_date, todo]) = do 
