@@ -21,13 +21,22 @@ I also suggest you compile it to use it - it's much faster to use that way. Just
 
 ##Features/Commands
 
-Haskerdeux currently includes the following commands: 
+Haskerdeux works in the following way:
 
-###Today
+`haskerdeux <date> <command> <optional args>`
 
-For listing today's todos only (as that is all I want to see)
+I.e. the date supplied is the date the commands act on. It understands "today", "tomorrow" and dates in "YYYY-MM-DD" format. All commands recognise and require a date.
 
-`haskerdeux today <username> <password>`
+It includes the following commands: 
+
+
+###Todos
+
+For listing todos only (as that is all I want to see)
+
+`haskerdeux today todos`
+`haskerdeux tomorrow todos`
+`haskerdeux 2017-02-28 todos`
 
 This returns a numbered list, like so:
 
@@ -36,45 +45,46 @@ This returns a numbered list, like so:
 	2 - Split development work in different branch
 	3 - Perhaps do some actual work you are paid to do
 
-You can use those numbers with the PutOff and CheckOff commands.
+You can use those numbers with the PutOff and CrossOff commands, etc.
 
 ###New
 
 For creating new tasks
 
-`haskerdeux new "<A todo item>"`
+`haskerdeux today new "<A todo item for today>"`
+`haskerdeux tomorrow new "<A todo item for tomorrow>"`
 
 ###PutOff
 
-For putting off a task until tomorrow.
+For putting off a task until the next day.
 
-`haskerdeux putoff <tasknumber from today list>`
+`haskerdeux today putoff <tasknumber from todos list>`
 
 E.g:
 
-`haskerdeux putoff 3`
+`haskerdeux today putoff 3`
 
 ###MoveTo
 
 For moving a task to another date.
 
-`haskerdeux moveto <tasknumber from today list> <date in YYYY:MM:DD>`
+`haskerdeux today moveto <tasknumber from todos list> <date in YYYY:MM:DD>`
 
 E.g:
 
-`haskerdeux moveto 11 2012-09-01`
+`haskerdeux today moveto 11 2012-09-01`
 
 ###CrossOff
 
 For marking a task as complete
 
-`haskerdeux crossoff <tasknumber from today list>`
+`haskerdeux today crossoff <tasknumber from todos list>`
 
 ###Delete
 
 For completely removing a task
 
-`haskerdeux delete <tasknumber from today list>`
+`haskerdeux today delete <tasknumber from todos list>`
 
 
 ##Using .netrc For Storing Username and Password

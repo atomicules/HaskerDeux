@@ -21,8 +21,7 @@ import Network.URI.Encode --need to install
 
 --Note to self: to run you type `runhaskell haskerdeux.hs test "me" "this" "that"`, etc
 dispatch :: String -> (String, [String]) -> IO()
-dispatch "today" = today
-dispatch "tomorrow" = tomorrow
+dispatch "todos" = todos
 dispatch "new" = new
 dispatch "crossoff" = crossoff
 dispatch "putoff" = putoff
@@ -31,14 +30,18 @@ dispatch "delete" = remove
 
 
 main = do 
+	(date:command:argList) <- getArgs
 	time <- getClockTime >>= toCalendarTime --https://wiki.haskell.org/Unix_tools/Date
 	let todays_date = formatCalendarTime defaultTimeLocale "%Y-%m-%d" time
-	(command:argList) <- getArgs
-	when ((command `elem` ["today", "tomorrow"] && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)) $ do
+	let tomorrows_date = show (addDays 1 $ read todays_date::Data.Time.Day)
+	let  todos_date | date == "today" = todays_date
+	                | date == "tomorrow" = tomorrows_date
+	                | otherwise = date
+	when ((command `elem` ["todos"] && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)) $ do
 		username <- fmap fst readnetrc
 		password <- fmap snd readnetrc
 		token <- login [username, password]
-		dispatch command (token, todays_date:argList)
+		dispatch command (token, todos_date:argList)
 
 
 readnetrc = do
@@ -130,38 +133,32 @@ login [username, password] = do
 			return token
 
 
-today (token, [todays_date]) = do
-	tdsf <- curlget (token, todays_date)
+todos (token, [todos_date]) = do
+	tdsf <- curlget (token, todos_date)
 	putStr $ unlines $ zipWith (\n td -> show n ++ " - " ++ td) [0..] $ Data.List.map text tdsf --numbering from LYAH
 
 
-tomorrow (token, [todays_date]) = do
-	let tomorrows_date = show (addDays 1 $ read todays_date::Data.Time.Day)
-	tdsf <- curlget (token, tomorrows_date)
-	putStr $ unlines $ Data.List.map ("- " ++) $ Data.List.map text tdsf
-
-
-new (token, [todays_date, todo]) = do 
+new (token, [todos_date, todo]) = do 
 	let encodedtodo = Network.URI.Encode.encode todo
-	curlpost (token, [todays_date, "text", todo, "https://teuxdeux.com/api/v1/todos/", "Added!"]) Nothing
+	curlpost (token, [todos_date, "text", todo, "https://teuxdeux.com/api/v1/todos/", "Added!"]) Nothing
 
 
-crossoff (token, [todays_date, number]) =
-	curlput (token, [todays_date, "{ \"done\": true }", "https://teuxdeux.com/api/v1/todos/", "Crossed Off!"]) number
+crossoff (token, [todos_date, number]) =
+	curlput (token, [todos_date, "{ \"done\": true }", "https://teuxdeux.com/api/v1/todos/", "Crossed Off!"]) number
 
 
-putoff (token, [todays_date, number]) = do
-	let tomorrows_date = show (addDays 1 $ read todays_date::Data.Time.Day)
-	curlpost (token, [todays_date, "current_date", tomorrows_date, "https://teuxdeux.com/api/v1/todos/reposition/", "Put Off!"]) (Just number)
+putoff (token, [todos_date, number]) = do
+	let tomorrows_date = show (addDays 1 $ read todos_date::Data.Time.Day)
+	curlpost (token, [todos_date, "current_date", tomorrows_date, "https://teuxdeux.com/api/v1/todos/reposition/", "Put Off!"]) (Just number)
 
 
-moveto (token, [todays_date, number, new_date]) =
+moveto (token, [todos_date, number, new_date]) =
 	--TODO: Need to figure out moving to bottom of a list
-	curlpost (token, [todays_date, "current_date", new_date, "https://teuxdeux.com/api/v1/todos/reposition", "Moved!"]) (Just number)
+	curlpost (token, [todos_date, "current_date", new_date, "https://teuxdeux.com/api/v1/todos/reposition", "Moved!"]) (Just number)
 
 
-remove (token, [todays_date, number]) =
-	curldelete (token, [todays_date, "https://teuxdeux.com/api/v1/todos/", "Deleted!"]) number
+remove (token, [todos_date, number]) =
+	curldelete (token, [todos_date, "https://teuxdeux.com/api/v1/todos/", "Deleted!"]) number
 
 
 --Thanks to http://www.amateurtopologist.com/blog/2010/11/05/a-haskell-newbies-guide-to-text-json/ and http://hpaste.org/41263/parsing_json_with_textjson
