@@ -1,15 +1,15 @@
-#Haskerdeux - A Simple Command Line Client for Teuxdeux in Haskell
+# Haskerdeux - A Simple Command Line Client for Teuxdeux in Haskell
 
 Written with the dual purpose of being a learning exercise for Haskell and also because I really wanted a command line tool for [Teuxdeux](http://teuxdeux.com). As it stands this is a bit rough and ready, but it does work.
 
 It used to use Network.Curl, but I can't get that to work anymore so I'm doing straight system calls to curl which means it's not very Haskelly and ultimately a bit of a pointless use of Haskell, but it's for me, so there.
 
-##Status
+## Status
 
 Alive! Official status is "Messy and works for me, unlikely to improve"; It was dead for years because I didn't think it was possible to get the new API to work.
 
 
-##Requirements
+## Requirements
 
 You need the following Haskell packages installed:
 
@@ -19,7 +19,7 @@ You need the following Haskell packages installed:
 I also suggest you compile it to use it - it's much faster to use that way. Just do `ghc --make haskerdeux.hs`. If you don't compile it then replace `./haskerdeux` in the examples below with `runhaskell haskerdeux.hs`.
 
 
-##Features/Commands
+## Features/Commands
 
 Haskerdeux works in the following way:
 
@@ -30,7 +30,7 @@ I.e. the date supplied is the date the commands act on. It understands "today", 
 It includes the following commands: 
 
 
-###Todos
+### Todos
 
 For listing todos only (as that is all I want to see)
 
@@ -47,14 +47,14 @@ This returns a numbered list, like so:
 
 You can use those numbers with the PutOff and CrossOff commands, etc.
 
-###New
+### New
 
 For creating new tasks
 
 `haskerdeux today new "<A todo item for today>"`
 `haskerdeux tomorrow new "<A todo item for tomorrow>"`
 
-###PutOff
+### PutOff
 
 For putting off a task until the next day.
 
@@ -64,7 +64,7 @@ E.g:
 
 `haskerdeux today putoff 3`
 
-###MoveTo
+### MoveTo
 
 For moving a task to another date.
 
@@ -74,20 +74,20 @@ E.g:
 
 `haskerdeux today moveto 11 2012-09-01`
 
-###CrossOff
+### CrossOff
 
 For marking a task as complete
 
 `haskerdeux today crossoff <tasknumber from todos list>`
 
-###Delete
+### Delete
 
 For completely removing a task
 
 `haskerdeux today delete <tasknumber from todos list>`
 
 
-##Using .netrc For Storing Username and Password
+## Using .netrc For Storing Username and Password
 
 It's compulsory. It used to support passing username/password as command line args, but no more. The `<username>` and `<password>` are read from `.netrc`. Just add an entry to `.netrc` as follows:
 
@@ -102,12 +102,12 @@ Or the single line format:
 It should work ok with either format. It won't work if you have spaces in your password though.
 
 
-##Development
+## Development
 
 Nope.
 
 
-##Thanks
+## Thanks
 
 Some resources that helped me figure this out:
 
