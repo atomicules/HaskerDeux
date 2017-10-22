@@ -115,18 +115,28 @@ getauthtoken body = do
 
 
 login [username, password] = do
-	--See if we have a token, then to clear we can just delete the file
-	--TODO: handle that error
 	home <- getHomeDirectory
-	check <- doesFileExist (home ++ "/.haskerdeux-token")
-	if check
-		then
-			readFile (home ++ "/.haskerdeux-token")
+	savedtoken <- doesFileExist (home ++ "/.haskerdeux-token")
+	--Need to make a query here and check token is still valid
+	--I am aware this is horribly unhaskelly and I plan on sorting that.
+	if savedtoken
+		then do
+			token <- readFile (home ++ "/.haskerdeux-token")
+			time <- getClockTime >>= toCalendarTime --https://wiki.haskell.org/Unix_tools/Date
+			let date = formatCalendarTime defaultTimeLocale "%Y-%m-%d" time
+			let curlheader = "X-CSRF-Token: " ++ token
+			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++date++"&end_date="++date] []
+			let ok = not ("Invalid CSRF Token" `isInfixOf` body)
+			if ok
+				then
+					return token
+				else do
+					removeFile (home ++ "/.haskerdeux-token")
+					login [username, password]
 		else do
 			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "https://teuxdeux.com/login"] []
 			token <- getauthtoken body
 			writeFile (home ++ "/.haskerdeux-token") token
-			--can probably use one post?
 			let curlheader = "X-CSRF-Token: " ++ token
 			let curlpostfields = "username=" ++ username ++ "&password=" ++ password ++ "&authenticity_token=" ++ token
 			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-d", curlpostfields, "https://teuxdeux.com/login"] []
