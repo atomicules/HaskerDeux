@@ -38,9 +38,7 @@ main = do
 	                | date == "tomorrow" = tomorrows_date
 	                | otherwise = date
 	when ((command `elem` ["todos"] && Data.List.null argList) || (command `elem` ["new", "crossoff", "putoff", "delete"] && length argList == 1) || (command == "moveto" && length argList == 2)) $ do
-		username <- fmap fst readnetrc
-		password <- fmap snd readnetrc
-		token <- login [username, password]
+		token <- login
 		dispatch command (token, todos_date:argList)
 
 
@@ -60,9 +58,15 @@ readnetrc = do
 curlget (token, date) = do
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++date++"&end_date="++date] []
-	let tds = decodeJSON body :: [Teuxdeux]
-	let tdsf = Data.List.filter (\td -> current_date td == date && not (done td)) tds
-	return tdsf
+	let ok = not ("Invalid CSRF Token" `isInfixOf` body)
+	if ok
+		then do
+			let tds = decodeJSON body :: [Teuxdeux]
+			let tdsf = Data.List.filter (\td -> current_date td == date && not (done td)) tds
+			return tdsf
+		else do
+			token <- relogin 
+			curlget (token, date)
 	
 
 curlpost (token, [date, key, value, apiurl, okresponse]) number = do
@@ -79,9 +83,15 @@ curlpost (token, [date, key, value, apiurl, okresponse]) number = do
 			let newjson = "{ \"current_date\" : \""++date++"\", \""++key++"\" : \""++value++"\"}"
 			return newjson
 	body <- readProcess "curl" ["-s", "-XPOST", apiurl, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
-	if "done_updated_at" `isInfixOf` body
-		then putStrLn okresponse
-		else putStrLn "Uh Oh! Didn't work!"
+	let ok = not ("Invalid CSRF Token" `isInfixOf` body)
+	if ok
+		then
+			if "done_updated_at" `isInfixOf` body
+				then putStrLn okresponse
+				else putStrLn "Uh Oh! Didn't work!"
+		else do
+			token <- relogin 
+			curlpost (token, [date, key, value, apiurl, okresponse]) number
 
 
 curldelete (token, [date, apiurl, okresponse]) number = do
@@ -89,9 +99,15 @@ curldelete (token, [date, apiurl, okresponse]) number = do
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-XDELETE", apiurl++show itemid, "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader] []
-	if "done_updated_at" `isInfixOf` body
-		then putStrLn okresponse
-		else putStrLn "Uh Oh! Didn't work!"
+	let ok = not ("Invalid CSRF Token" `isInfixOf` body)
+	if ok
+		then
+			if "done_updated_at" `isInfixOf` body
+				then putStrLn okresponse
+				else putStrLn "Uh Oh! Didn't work!"
+		else do
+			token <- relogin 
+			curldelete (token, [date, apiurl, okresponse]) number
 
 
 curlput (token, [date, json, apiurl, okresponse]) number = do
@@ -99,9 +115,15 @@ curlput (token, [date, json, apiurl, okresponse]) number = do
 	let itemid = Main.id $ tdsf!!(read number::Int)
 	let curlheader = "X-CSRF-Token: " ++ token
 	body <- readProcess "curl" ["-s", "-XPUT", apiurl++show itemid, "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-H", "Content-Type: application/json", "-d", json] []
-	if "done_updated_at" `isInfixOf` body
-		then putStrLn okresponse
-		else putStrLn "Uh Oh! Didn't work!"
+	let ok = not ("Invalid CSRF Token" `isInfixOf` body)
+	if ok
+		then
+			if "done_updated_at" `isInfixOf` body
+				then putStrLn okresponse
+				else putStrLn "Uh Oh! Didn't work!"
+		else do
+			token <- relogin 
+			curlput (token, [date, json, apiurl, okresponse]) number
 
 
 getauthtoken body = do
@@ -114,25 +136,15 @@ getauthtoken body = do
 	return authtoken
 
 
-login [username, password] = do
+login  = do
+	username <- fmap fst readnetrc
+	password <- fmap snd readnetrc
 	home <- getHomeDirectory
 	savedtoken <- doesFileExist (home ++ "/.haskerdeux-token")
-	--Need to make a query here and check token is still valid
-	--I am aware this is horribly unhaskelly and I plan on sorting that.
 	if savedtoken
 		then do
 			token <- readFile (home ++ "/.haskerdeux-token")
-			time <- getClockTime >>= toCalendarTime --https://wiki.haskell.org/Unix_tools/Date
-			let date = formatCalendarTime defaultTimeLocale "%Y-%m-%d" time
-			let curlheader = "X-CSRF-Token: " ++ token
-			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "https://teuxdeux.com/api/v1/todos/calendar?begin_date="++date++"&end_date="++date] []
-			let ok = not ("Invalid CSRF Token" `isInfixOf` body)
-			if ok
-				then
-					return token
-				else do
-					removeFile (home ++ "/.haskerdeux-token")
-					login [username, password]
+			return token
 		else do
 			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "https://teuxdeux.com/login"] []
 			token <- getauthtoken body
@@ -142,6 +154,13 @@ login [username, password] = do
 			body <- readProcess "curl" ["-s", "-L", "-c", "haskerdeux.cookies", "-b", "haskerdeux.cookies", "-H", curlheader, "-d", curlpostfields, "https://teuxdeux.com/login"] []
 			return token
 
+
+relogin = do
+	home <- getHomeDirectory
+	removeFile (home ++ "/.haskerdeux-token")
+	token <- login
+	return token
+	
 
 todos (token, [todos_date]) = do
 	tdsf <- curlget (token, todos_date)
